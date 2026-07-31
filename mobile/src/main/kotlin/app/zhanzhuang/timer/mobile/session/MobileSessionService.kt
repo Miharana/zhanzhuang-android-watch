@@ -83,8 +83,12 @@ class MobileSessionService : Service() {
             ACTION_RESUME -> serviceScope.launch { runtime.resume() }
             ACTION_FINISH -> serviceScope.launch { runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false)) }
             null -> serviceScope.launch { runtime.recover() }
+            else -> serviceScope.launch { runtime.recover() }
         }
-        return if (intent?.action == ACTION_FINISH) START_NOT_STICKY else START_STICKY
+        return when (intent?.action) {
+            null, ACTION_START, ACTION_PAUSE, ACTION_RESUME -> START_STICKY
+            else -> START_NOT_STICKY
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
