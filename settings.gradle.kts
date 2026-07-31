@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "站桩 · Zhan Zhuang"
-include(":core:model", ":core:domain")
+include(":core:model", ":core:domain", ":mobile")
