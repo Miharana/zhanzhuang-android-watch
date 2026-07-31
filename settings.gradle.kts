@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZhanZhuang"
+rootProject.name = "站桩 · Zhan Zhuang"
 include(":core:model", ":core:domain")
