@@ -22,6 +22,7 @@
 - Sparkle runs once for 280–420 ms at start/completion; never ambient, battery-saver, or reduced-motion.
 - Health permissions are contextual and optional; denial keeps duration-only sessions usable.
 - Signing material and service-account JSON remain outside Git; initial Play mutation is `internal` only.
+- Upload key path is `/Users/pema/.config/zhanzhuang/signing/zhanzhuang-upload.jks`; Play service-account path is `/Users/pema/.config/zhanzhuang/google-play/fastlane-supply.json`.
 - Local toolchain: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`; SDK `/opt/homebrew/share/android-commandlinetools`.
 
 ---
@@ -65,7 +66,7 @@
 
 - [ ] **Step 2: Create build files and verify RED**
 
-Use the versions in the plan header; include all four modules. Generate the wrapper with the known local Gradle wrapper:
+Use the versions in the plan header; initially include only `:core:model` and `:core:domain`, then add each application module in the task that creates it. Generate the wrapper with the known local Gradle wrapper:
 
 ```bash
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
@@ -111,6 +112,7 @@ Expected: all core tests pass; no `local.properties`, key, or password is staged
 
 **Files:**
 - Create: `mobile/build.gradle.kts`, `mobile/src/main/AndroidManifest.xml`
+- Modify: `settings.gradle.kts` to include `:mobile`
 - Create: `mobile/src/main/kotlin/app/zhanzhuang/timer/mobile/data/{SessionEntity,HeartRateEntity,SessionDao,MobileDatabase,MobileSessionRepository}.kt`
 - Create: `mobile/src/main/kotlin/app/zhanzhuang/timer/mobile/session/{MobileSessionController,MobileSessionService}.kt`
 - Test: `mobile/src/test/kotlin/app/zhanzhuang/timer/mobile/data/MobileSessionRepositoryTest.kt`
@@ -231,6 +233,7 @@ Expected: feature fallback, permission denial, partial write, and idempotency te
 
 **Files:**
 - Create: `wear/build.gradle.kts`, `wear/src/main/AndroidManifest.xml`
+- Modify: `settings.gradle.kts` to include `:wear`
 - Create: `wear/src/main/kotlin/app/zhanzhuang/timer/wear/data/{WearDatabase,WearSessionRepository,OutboxEntity}.kt`
 - Create: `wear/src/main/kotlin/app/zhanzhuang/timer/wear/health/{WearHealthClient,AndroidWearHealthClient}.kt`
 - Create: `wear/src/main/kotlin/app/zhanzhuang/timer/wear/session/HapticCuePlayer.kt`
@@ -630,8 +633,8 @@ Expected: automated gate passes; physical rows truthfully reflect executed evide
 : "${ZHANZHUANG_KEY_PASSWORD:?missing ZHANZHUANG_KEY_PASSWORD}"
 test ! -e fastlane/service-account.json
 ./gradlew clean test lintRelease :mobile:bundleRelease :wear:bundleRelease
-jarsigner -verify -strict mobile/build/outputs/bundle/release/mobile-release.aab
-jarsigner -verify -strict wear/build/outputs/bundle/release/wear-release.aab
+"$JAVA_HOME/bin/jarsigner" -verify -strict mobile/build/outputs/bundle/release/mobile-release.aab
+"$JAVA_HOME/bin/jarsigner" -verify -strict wear/build/outputs/bundle/release/wear-release.aab
 ```
 
 Expected without external signing values: fail on the first missing variable.
@@ -709,8 +712,8 @@ Record package `app.zhanzhuang.timer`, version `0.1.0`, mobile `1000001`, Wear `
 - [ ] **Step 2: Upload metadata/assets and mobile AAB once**
 
 ```bash
-SUPPLY_JSON_KEY=/absolute/repo-external/path/google-play.json bundle exec fastlane android publish_metadata
-SUPPLY_JSON_KEY=/absolute/repo-external/path/google-play.json bundle exec fastlane android upload_mobile_internal
+SUPPLY_JSON_KEY=/Users/pema/.config/zhanzhuang/google-play/fastlane-supply.json bundle exec fastlane android publish_metadata
+SUPPLY_JSON_KEY=/Users/pema/.config/zhanzhuang/google-play/fastlane-supply.json bundle exec fastlane android upload_mobile_internal
 ```
 
 Expected: package `app.zhanzhuang.timer`, track `internal`, code `1000001`. After ambiguous HTTP 5xx, read remote state; never blindly repeat upload.
