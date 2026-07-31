@@ -22,16 +22,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 class MobileSessionService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private lateinit var controller: MobileSessionController
+    private lateinit var runtime: MobileSessionServiceRuntime
+    private var tickJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
-        controller = DefaultMobileSessionController(
+        val controller = DefaultMobileSessionController(
             repository = MobileSessionRepository(
-                Room.databaseBuilder(applicationContext, MobileDatabase::class.java, DATABASE_NAME).build(),
+                Room.databaseBuilder(applicationContext, MobileDatabase::class.java, DATABASE_NAME)
+                    .addMigrations(MobileDatabase.MIGRATION_1_2)
+                    .build(),
             ),
             elapsedClock = ElapsedClock { SystemClock.elapsedRealtime() },
             wallClock = WallClock { System.currentTimeMillis() },
@@ -39,34 +43,54 @@ class MobileSessionService : Service() {
         )
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, notification())
-        serviceScope.launch {
-            while (isActive) {
-                controller.tick()
-                delay(TICK_INTERVAL_MS)
+        runtime = MobileSessionServiceRuntime(controller, object : MobileForegroundServiceHost {
+            override fun startTicker() {
+                if (tickJob?.isActive == true) return
+                tickJob = serviceScope.launch {
+                    while (isActive) {
+                        runtime.tick()
+                        delay(TICK_INTERVAL_MS)
+                    }
+                }
             }
-        }
+
+            override fun stopTicker() {
+                tickJob?.cancel()
+                tickJob = null
+            }
+
+            override fun removeForegroundNotification() {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            }
+
+            override fun stopSelf() {
+                this@MobileSessionService.stopSelf()
+            }
+        })
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> serviceScope.launch {
-                controller.start(
+                runtime.start(
                     SessionConfig(
                         intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
                         intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
                     ),
                 )
             }
-            ACTION_PAUSE -> serviceScope.launch { controller.pause() }
-            ACTION_RESUME -> serviceScope.launch { controller.resume() }
-            ACTION_FINISH -> serviceScope.launch { controller.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false)) }
+            ACTION_PAUSE -> serviceScope.launch { runtime.pause() }
+            ACTION_RESUME -> serviceScope.launch { runtime.resume() }
+            ACTION_FINISH -> serviceScope.launch { runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false)) }
+            null -> serviceScope.launch { runtime.recover() }
         }
-        return START_NOT_STICKY
+        return if (intent?.action == ACTION_FINISH) START_NOT_STICKY else START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        tickJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()
     }

@@ -21,6 +21,9 @@ interface SessionDao {
     @Query("SELECT * FROM heart_rate_samples WHERE sessionId = :sessionId ORDER BY epochMillis")
     suspend fun samplesFor(sessionId: String): List<HeartRateEntity>
 
+    @Query("SELECT * FROM mobile_runtime WHERE singletonId = 1")
+    suspend fun runtimeSnapshot(): MobileRuntimeEntity?
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnoringConflict(entity: SessionEntity): Long
 
@@ -45,11 +48,24 @@ interface SessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSamples(samples: List<HeartRateEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveRuntime(runtime: MobileRuntimeEntity)
+
+    @Query("DELETE FROM mobile_runtime")
+    suspend fun clearRuntime()
+
     @Transaction
-    suspend fun upsertIfNewer(entity: SessionEntity, samples: List<HeartRateEntity>) {
+    suspend fun upsertIfNewer(
+        entity: SessionEntity,
+        samples: List<HeartRateEntity>,
+        runtime: MobileRuntimeEntity?,
+    ) {
         val existing = get(entity.id)
         if (existing == null) {
-            if (insertIgnoringConflict(entity) != -1L) replaceSamples(entity.id, samples)
+            if (insertIgnoringConflict(entity) != -1L) {
+                replaceSamples(entity.id, samples)
+                replaceRuntime(runtime)
+            }
             return
         }
         if (entity.revision <= existing.revision) return
@@ -68,10 +84,15 @@ interface SessionDao {
             healthConnectState = entity.healthConnectState,
         )
         replaceSamples(entity.id, samples)
+        replaceRuntime(runtime)
     }
 
     private suspend fun replaceSamples(sessionId: String, samples: List<HeartRateEntity>) {
         deleteSamples(sessionId)
         if (samples.isNotEmpty()) insertSamples(samples)
+    }
+
+    private suspend fun replaceRuntime(runtime: MobileRuntimeEntity?) {
+        if (runtime == null) clearRuntime() else saveRuntime(runtime)
     }
 }

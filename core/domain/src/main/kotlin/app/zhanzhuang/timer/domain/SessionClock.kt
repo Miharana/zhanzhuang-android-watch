@@ -15,7 +15,19 @@ class SessionClock(
 ) {
     private var pausedAtElapsedMs: Long? = null
     private var pausedDurationMs = 0L
-    private var lastReminderIndex = 0
+    private var lastAcknowledgedReminderIndex = 0
+
+    private constructor(
+        config: SessionConfig,
+        startedAtElapsedMs: Long,
+        pausedAtElapsedMs: Long?,
+        pausedDurationMs: Long,
+        lastAcknowledgedReminderIndex: Int,
+    ) : this(config, startedAtElapsedMs) {
+        this.pausedAtElapsedMs = pausedAtElapsedMs
+        this.pausedDurationMs = pausedDurationMs
+        this.lastAcknowledgedReminderIndex = lastAcknowledgedReminderIndex
+    }
 
     fun pause(nowElapsedMs: Long) {
         require(nowElapsedMs >= startedAtElapsedMs)
@@ -27,6 +39,11 @@ class SessionClock(
         require(nowElapsedMs >= pausedAt)
         pausedDurationMs += nowElapsedMs - pausedAt
         pausedAtElapsedMs = null
+    }
+
+    fun acknowledgeReminder(index: Int) {
+        require(index > lastAcknowledgedReminderIndex)
+        lastAcknowledgedReminderIndex = index
     }
 
     fun snapshot(nowElapsedMs: Long): ClockSnapshot {
@@ -50,13 +67,25 @@ class SessionClock(
     private fun dueReminderIndex(activeElapsedMs: Long, totalDurationMs: Long): Int? {
         val intervalMs = config.intervalMinutes * MINUTE_MS
         val latestDueIndex = minOf(activeElapsedMs, totalDurationMs) / intervalMs
-        if (latestDueIndex <= lastReminderIndex) return null
-
-        lastReminderIndex = latestDueIndex.toInt()
-        return lastReminderIndex
+        if (latestDueIndex <= lastAcknowledgedReminderIndex) return null
+        return latestDueIndex.toInt()
     }
 
-    private companion object {
+    companion object {
+        fun restore(
+            config: SessionConfig,
+            startedAtElapsedMs: Long,
+            pausedAtElapsedMs: Long?,
+            pausedDurationMs: Long,
+            lastAcknowledgedReminderIndex: Int,
+        ) = SessionClock(
+            config = config,
+            startedAtElapsedMs = startedAtElapsedMs,
+            pausedAtElapsedMs = pausedAtElapsedMs,
+            pausedDurationMs = pausedDurationMs,
+            lastAcknowledgedReminderIndex = lastAcknowledgedReminderIndex,
+        )
+
         const val MINUTE_MS = 60_000L
     }
 }

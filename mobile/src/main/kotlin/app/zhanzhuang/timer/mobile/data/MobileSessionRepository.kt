@@ -8,7 +8,8 @@ interface SessionRepository {
     fun observeSessions(): Flow<List<SessionRecord>>
     suspend fun get(id: String): SessionRecord?
     suspend fun activeSession(): SessionRecord?
-    suspend fun upsert(record: SessionRecord)
+    suspend fun runtimeSnapshot(): MobileRuntimeSnapshot?
+    suspend fun upsert(record: SessionRecord, runtimeSnapshot: MobileRuntimeSnapshot? = null)
 }
 
 class MobileSessionRepository(database: MobileDatabase) : SessionRepository {
@@ -26,7 +27,13 @@ class MobileSessionRepository(database: MobileDatabase) : SessionRepository {
         session.toRecord(dao.samplesFor(session.id))
     }
 
-    override suspend fun upsert(record: SessionRecord) {
-        dao.upsertIfNewer(record.toEntity(), record.heartRateSamples.map { it.toEntity(record.id) })
+    override suspend fun runtimeSnapshot(): MobileRuntimeSnapshot? = dao.runtimeSnapshot()?.toSnapshot()
+
+    override suspend fun upsert(record: SessionRecord, runtimeSnapshot: MobileRuntimeSnapshot?) {
+        dao.upsertIfNewer(
+            entity = record.toEntity(),
+            samples = record.heartRateSamples.map { it.toEntity(record.id) },
+            runtime = runtimeSnapshot?.toEntity(),
+        )
     }
 }
