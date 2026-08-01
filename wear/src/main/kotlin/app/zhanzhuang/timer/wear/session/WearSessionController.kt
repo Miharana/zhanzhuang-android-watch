@@ -30,6 +30,16 @@ data class WearSessionUiState(
     val heartRateUnavailableReason: String? = null,
 )
 
+/** The activity observes this process bridge; the service/controller remains the sole timer authority. */
+object WearSessionUiBridge {
+    private val _state = MutableStateFlow(WearSessionUiState(null, 0, null, null))
+    val state: StateFlow<WearSessionUiState> = _state.asStateFlow()
+
+    fun publish(state: WearSessionUiState) {
+        _state.value = state
+    }
+}
+
 interface WearSessionController {
     val state: StateFlow<WearSessionUiState>
     suspend fun start(config: SessionConfig, sessionId: String = UUID.randomUUID().toString())

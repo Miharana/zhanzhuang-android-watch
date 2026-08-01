@@ -55,6 +55,9 @@ class WearSessionService : Service() {
         notification = OngoingSessionNotification(applicationContext)
         commands = WearSessionCommandProcessor(controller)
         serviceScope.launch {
+            controller.state.collect { state -> WearSessionUiBridge.publish(state) }
+        }
+        serviceScope.launch {
             health.updates.collect { update -> controller.acceptHealthUpdate(update) }
         }
         serviceScope.launch {
