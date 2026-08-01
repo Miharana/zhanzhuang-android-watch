@@ -41,6 +41,7 @@ sealed interface SyncPayload {
 /** The small wire surface shared by the Android Data Layer adapters and coordinator tests. */
 interface SyncTransport {
     suspend fun sendMessage(envelope: SyncEnvelope): Boolean
+    suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean = sendMessage(envelope)
     suspend fun putCompleted(envelope: SyncEnvelope): Boolean
 }
 
@@ -48,7 +49,8 @@ object SyncWireCodec {
     const val DATA_KEY_ENVELOPE = "sync_envelope_gzip"
     const val MAX_MESSAGE_BYTES = 32 * 1024
     const val MAX_COMPLETED_COMPRESSED_BYTES = 64 * 1024
-    const val MAX_COMPLETED_DECOMPRESSED_BYTES = 256 * 1024
+    const val MAX_COMPLETED_DECOMPRESSED_BYTES = 512 * 1024
+    const val MAX_COMPLETED_SAMPLES = 2_048
 
     private val json = Json {
         classDiscriminator = "type"
@@ -67,7 +69,13 @@ object SyncWireCodec {
 
     fun encodeCompleted(envelope: SyncEnvelope): ByteArray {
         require(envelope.payload is SyncPayload.Completed) { "Only completion records are DataItems" }
-        val encoded = encodeMessage(envelope)
+        val completed = envelope.payload as SyncPayload.Completed
+        val encoded = json.encodeToString(
+            envelope.copy(payload = SyncPayload.Completed(completed.record.copy(
+                heartRateSamples = SyncHeartRateSampler.forTransfer(completed.record.heartRateSamples),
+            ))),
+        ).encodeToByteArray()
+        require(encoded.size <= MAX_COMPLETED_DECOMPRESSED_BYTES) { "Completion JSON exceeds $MAX_COMPLETED_DECOMPRESSED_BYTES bytes" }
         return ByteArrayOutputStream().use { output ->
             GZIPOutputStream(output).use { it.write(encoded) }
             output.toByteArray().also {
@@ -111,4 +119,16 @@ object SyncWireCodec {
 
     fun decodeCompletedFromOutbox(payload: String): SyncEnvelope =
         decodeCompleted(Base64.getDecoder().decode(payload))
+}
+
+/** Sync-only representation; Wear Room retains every original measurement. */
+object SyncHeartRateSampler {
+    fun forTransfer(samples: List<HeartRateSample>, maximum: Int = SyncWireCodec.MAX_COMPLETED_SAMPLES): List<HeartRateSample> {
+        require(maximum >= 2)
+        val ordered = samples.sortedBy(HeartRateSample::epochMillis).distinctBy(HeartRateSample::epochMillis)
+        if (ordered.size <= maximum) return ordered
+        return List(maximum) { index ->
+            ordered[(index.toLong() * (ordered.size - 1) / (maximum - 1)).toInt()]
+        }
+    }
 }

@@ -64,7 +64,7 @@ class WearDataLayerService : com.google.android.gms.wearable.WearableListenerSer
         if (event.path !in setOf(PATH_COMMAND, PATH_STATE, PATH_ACK)) return
         scope.launch {
             val envelope = runCatching { SyncWireCodec.decodeMessage(event.data) }.getOrNull() ?: return@launch
-            receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope) } }
+            receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope, event.sourceNodeId) } }
         }
     }
 
@@ -75,7 +75,7 @@ class WearDataLayerService : com.google.android.gms.wearable.WearableListenerSer
                     .getOrNull() ?: return@forEach
                 scope.launch {
                     val envelope = runCatching { SyncWireCodec.decodeCompleted(payload) }.getOrNull() ?: return@launch
-                    receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope) } }
+                    receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope, event.dataItem.uri.host) } }
                 }
             }
     }
@@ -102,6 +102,17 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
         return nodes.map { node ->
             runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getMessageClient(appContext).sendMessage(node.id, path, SyncWireCodec.encodeMessage(envelope)).await() } != null }.getOrDefault(false)
         }.any { it }
+    }
+
+    override suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean {
+        val path = when (envelope.payload) {
+            is SyncPayload.Ack -> PATH_ACK
+            is SyncPayload.State -> PATH_STATE
+            else -> PATH_COMMAND
+        }
+        return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) {
+            Wearable.getMessageClient(appContext).sendMessage(nodeId, path, SyncWireCodec.encodeMessage(envelope)).await()
+        } != null }.getOrDefault(false)
     }
 
     override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {

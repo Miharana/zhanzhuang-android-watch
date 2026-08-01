@@ -9,6 +9,7 @@ import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.session.WearSessionService
+import kotlinx.coroutines.delay
 
 /** Routes remote commands through the existing health foreground service. */
 class WearServiceSyncController(
@@ -47,12 +48,24 @@ class WearServiceSyncController(
     override suspend fun mergeRemote(record: SessionRecord): SessionRecord = repository.get(record.id) ?: record
 
     private suspend fun command(sessionId: String, action: String): SessionRecord? {
-        val current = session(sessionId) ?: return null
-        startForeground(Intent(context, WearSessionService::class.java).setAction(action))
-        return current
+        val current = repository.activeSession()?.takeIf { it.id == sessionId } ?: return null
+        startForeground(Intent(context, WearSessionService::class.java)
+            .setAction(action)
+            .putExtra(WearSessionService.EXTRA_SESSION_ID, sessionId))
+        repeat(MAX_STATE_POLLS) {
+            delay(STATE_POLL_MS)
+            val updated = repository.get(sessionId)
+            if (updated != null && updated.revision > current.revision) return updated
+        }
+        return null
     }
 
     private fun startForeground(intent: Intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+    }
+
+    private companion object {
+        const val MAX_STATE_POLLS = 10
+        const val STATE_POLL_MS = 50L
     }
 }

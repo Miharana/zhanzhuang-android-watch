@@ -59,7 +59,7 @@ class MobileDataLayerService : com.google.android.gms.wearable.WearableListenerS
         scope.launch {
             val envelope = runCatching { SyncWireCodec.decodeMessage(event.data) }.getOrNull() ?: return@launch
             receiveMutex.withLock {
-                runCatching { MobileSyncRuntime.get(applicationContext).receiveCommand(envelope) }
+                runCatching { MobileSyncRuntime.get(applicationContext).receiveCommand(envelope, event.sourceNodeId) }
             }
         }
     }
@@ -73,7 +73,7 @@ class MobileDataLayerService : com.google.android.gms.wearable.WearableListenerS
                 scope.launch {
                     val envelope = runCatching { SyncWireCodec.decodeCompleted(payload) }.getOrNull() ?: return@launch
                     val acknowledged = receiveMutex.withLock {
-                        runCatching { MobileSyncRuntime.get(applicationContext).receiveCompleted(envelope) }.getOrDefault(false)
+                        runCatching { MobileSyncRuntime.get(applicationContext).receiveCompleted(envelope, uri.host) }.getOrDefault(false)
                     }
                     if (acknowledged) {
                         runCatching { Wearable.getDataClient(applicationContext).deleteDataItems(uri).await() }
@@ -104,6 +104,17 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
         return nodes.map { node ->
             runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getMessageClient(appContext).sendMessage(node.id, path, SyncWireCodec.encodeMessage(envelope)).await() } != null }.getOrDefault(false)
         }.any { it }
+    }
+
+    override suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean {
+        val path = when (envelope.payload) {
+            is app.zhanzhuang.timer.model.SyncPayload.Ack -> PATH_ACK
+            is app.zhanzhuang.timer.model.SyncPayload.State -> PATH_STATE
+            else -> PATH_COMMAND
+        }
+        return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) {
+            Wearable.getMessageClient(appContext).sendMessage(nodeId, path, SyncWireCodec.encodeMessage(envelope)).await()
+        } != null }.getOrDefault(false)
     }
 
     override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {

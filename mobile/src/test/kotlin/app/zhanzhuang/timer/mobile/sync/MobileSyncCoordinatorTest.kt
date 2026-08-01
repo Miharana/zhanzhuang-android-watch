@@ -106,6 +106,21 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun queryStateNeverTransfersHeartRateHistory() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also {
+            it.mergeRemote(record(SessionOwner.WEAR).copy(heartRateSamples = (1..10_800).map { sample ->
+                app.zhanzhuang.timer.model.HeartRateSample(sample.toLong(), 60.0, app.zhanzhuang.timer.model.SampleAccuracy.HIGH)
+            }))
+        }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 10_000L })
+
+        assertTrue(coordinator.receiveCommand(envelope("query", 1, SyncPayload.QueryState)))
+        val state = transport.envelopes.single().payload as SyncPayload.State
+        assertTrue(state.record.heartRateSamples.isEmpty())
+    }
+
+    @Test
     fun lowerRevisionStateCannotReplaceCurrentOwner() = runTest {
         val controller = FakeController().also {
             it.mergeRemote(record(SessionOwner.MOBILE).copy(revision = 5))
@@ -154,9 +169,11 @@ class MobileSyncCoordinatorTest {
 
     private class FakeTransport : SyncTransport {
         val sentPayloadNames = mutableListOf<String>()
+        val envelopes = mutableListOf<SyncEnvelope>()
 
         override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
             sentPayloadNames += envelope.payload::class.simpleName!!.replace("QueryState", "QUERY_STATE").uppercase()
+            envelopes += envelope
             return true
         }
 

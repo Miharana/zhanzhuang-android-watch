@@ -46,22 +46,22 @@ class WearSyncCoordinator(
     private val seenEventIds = LinkedHashSet<String>()
     private val mutex = Mutex()
 
-    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean = mutex.withLock {
+    suspend fun receiveCommand(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
         if (!acceptEnvelope(envelope)) return false
         return when (val payload = envelope.payload) {
             is SyncPayload.Ack -> acknowledge(envelope.eventId, envelope.sessionId, envelope.revision, payload.acceptedRevision)
             is SyncPayload.Start -> {
                 if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
                 if (isLowerRevision(envelope)) return false
-                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it) } != null
+                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it, sourceNodeId) } != null
             }
-            SyncPayload.QueryState -> controller?.current()?.let { sendState(it) } != null
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it) } != null
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it) } != null
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it) } != null
+            SyncPayload.QueryState -> controller?.current()?.let { sendState(it, sourceNodeId) } != null
+            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } != null
+            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } != null
+            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it, sourceNodeId) } != null
             is SyncPayload.CancelIfUnowned -> {
                 val current = controller?.current() ?: return false
-                if (current.id == envelope.sessionId && current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it) } != null else false
+                if (current.id == envelope.sessionId && current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it, sourceNodeId) } != null else false
             }
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> mergeRemote(payload.record)
@@ -92,15 +92,19 @@ class WearSyncCoordinator(
         return true
     }
 
-    private suspend fun sendState(record: SessionRecord): Boolean = transport.sendMessage(
+    private suspend fun sendState(record: SessionRecord, sourceNodeId: String?): Boolean = respond(
         SyncEnvelope(
             eventId = UUID.randomUUID().toString(),
             sessionId = record.id,
             revision = record.revision,
             sentAtEpochMillis = nowEpochMillis(),
-            payload = SyncPayload.State(record),
+            payload = SyncPayload.State(record.copy(heartRateSamples = emptyList())),
         ),
+        sourceNodeId,
     )
+
+    private suspend fun respond(envelope: SyncEnvelope, sourceNodeId: String?): Boolean =
+        if (sourceNodeId == null) transport.sendMessage(envelope) else transport.sendMessageTo(envelope, sourceNodeId)
 
     private fun acceptEnvelope(envelope: SyncEnvelope): Boolean {
         if (envelope.protocolVersion != PROTOCOL_VERSION || envelope.eventId.isBlank()) return false

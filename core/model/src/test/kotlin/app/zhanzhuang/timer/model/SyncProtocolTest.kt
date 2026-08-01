@@ -3,6 +3,7 @@ package app.zhanzhuang.timer.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class SyncProtocolTest {
     @Test
@@ -38,5 +39,22 @@ class SyncProtocolTest {
         assertFailsWith<IllegalArgumentException> {
             SyncWireCodec.decodeCompleted(byteArrayOf(1, 2, 3))
         }
+    }
+
+    @Test
+    fun threeHourHeartRateTransferIsBoundedAndKeepsEndpoints() {
+        val samples = (0 until 10_800).map { HeartRateSample(1_000L + it * 1_000L, 60.0 + it % 5, SampleAccuracy.HIGH) }
+        val envelope = SyncEnvelope(eventId = "event", sessionId = "session", revision = 4, sentAtEpochMillis = 1_000, payload = SyncPayload.Completed(
+            SessionRecord(id = "session", revision = 4, status = SessionStatus.COMPLETED, owner = SessionOwner.WEAR,
+                startEpochMillis = samples.first().epochMillis, endEpochMillis = samples.last().epochMillis, activeDurationMs = 10_800_000,
+                heartRateSamples = samples),
+        ))
+
+        val decoded = SyncWireCodec.decodeCompleted(SyncWireCodec.encodeCompleted(envelope))
+        val transferred = (decoded.payload as SyncPayload.Completed).record.heartRateSamples
+        assertTrue(transferred.size <= SyncWireCodec.MAX_COMPLETED_SAMPLES)
+        assertEquals(samples.first(), transferred.first())
+        assertEquals(samples.last(), transferred.last())
+        assertTrue(transferred.zipWithNext().all { (a, b) -> a.epochMillis < b.epochMillis })
     }
 }

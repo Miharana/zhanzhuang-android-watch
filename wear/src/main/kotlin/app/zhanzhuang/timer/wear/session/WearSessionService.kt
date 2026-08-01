@@ -50,7 +50,7 @@ class WearSessionService : Service() {
             health = health,
             haptics = AndroidHapticCuePlayer(getSystemService(Vibrator::class.java)),
             bootId = { currentBootId(applicationContext) },
-            completionSyncScheduler = { app.zhanzhuang.timer.wear.sync.WearCompletionSyncWorker.enqueue(applicationContext) },
+            completionSyncScheduler = { eventId -> app.zhanzhuang.timer.wear.sync.WearCompletionSyncWorker.enqueue(applicationContext, eventId) },
         )
         notification = OngoingSessionNotification(applicationContext)
         commands = WearSessionCommandProcessor(controller)
@@ -76,7 +76,7 @@ class WearSessionService : Service() {
         val commandGeneration = generation.incrementAndGet()
         // This satisfies the FGS deadline; the recovery-only notification has no OngoingActivity extension.
         startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
-        requests.trySend(ServiceRequest.Command(command, startId, commandGeneration))
+        requests.trySend(ServiceRequest.Command(command, intent?.getStringExtra(EXTRA_SESSION_ID), startId, commandGeneration))
         return START_STICKY
     }
 
@@ -110,7 +110,7 @@ class WearSessionService : Service() {
 
     private suspend fun processRequest(request: ServiceRequest) {
         when (request) {
-            is ServiceRequest.Command -> when (commands.process(request.command, currentBootId(applicationContext))) {
+            is ServiceRequest.Command -> when (commands.process(request.command, currentBootId(applicationContext), request.expectedSessionId)) {
                 ServiceCommandResult.ACTIVE -> {
                     publishForeground(request.generation)
                     startTicker(request.startId, request.generation)
@@ -131,7 +131,7 @@ class WearSessionService : Service() {
     }
 
     private sealed interface ServiceRequest {
-        data class Command(val command: WearSessionService.Command, val startId: Int, val generation: Long) : ServiceRequest
+        data class Command(val command: WearSessionService.Command, val expectedSessionId: String?, val startId: Int, val generation: Long) : ServiceRequest
         data class Tick(val startId: Int, val generation: Long) : ServiceRequest
     }
 
@@ -217,7 +217,7 @@ class WearSessionService : Service() {
 class WearSessionCommandProcessor(private val controller: WearSessionController) {
     private val mutex = Mutex()
 
-    suspend fun process(command: WearSessionService.Command, bootId: String): ServiceCommandResult = mutex.withLock {
+    suspend fun process(command: WearSessionService.Command, bootId: String, expectedSessionId: String? = null): ServiceCommandResult = mutex.withLock {
         when (controller.recover(bootId)) {
             WearSessionRecovery.NO_SESSION -> when (command) {
                 is WearSessionService.Command.Start -> { controller.start(command.config, command.sessionId); ServiceCommandResult.ACTIVE }
@@ -227,7 +227,9 @@ class WearSessionCommandProcessor(private val controller: WearSessionController)
                 is WearSessionService.Command.Start -> { controller.start(command.config, command.sessionId); ServiceCommandResult.ACTIVE }
                 else -> ServiceCommandResult.STOP
             }
-            WearSessionRecovery.ACTIVE -> when (command) {
+            WearSessionRecovery.ACTIVE -> if (expectedSessionId != null && controller.state.value.record?.id != expectedSessionId) {
+                ServiceCommandResult.REJECTED
+            } else when (command) {
                 // Reject the requested new session, but retain the recovered active one.
                 is WearSessionService.Command.Start -> ServiceCommandResult.ACTIVE
                 WearSessionService.Command.Finish -> { controller.finish(); ServiceCommandResult.STOP }
