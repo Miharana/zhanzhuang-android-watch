@@ -61,6 +61,19 @@ class WearSessionRepositoryTest {
         assertNull(repository.pendingOutbox().singleOrNull())
     }
 
+    @Test
+    fun newerSessionRevisionDoesNotDeleteAnUnacknowledgedOutboxEvent() = runTest {
+        repository.upsert(record(revision = 2, status = SessionStatus.COMPLETED))
+        repository.enqueueCompleted("event-2", "s1", revision = 2, payload = "revision-2")
+
+        repository.upsert(record(revision = 3, status = SessionStatus.COMPLETED))
+
+        assertEquals(
+            listOf(OutboxEntity(eventId = "event-2", sessionId = "s1", revision = 2, payload = "revision-2")),
+            repository.pendingOutbox(),
+        )
+    }
+
     private fun record(revision: Long, status: SessionStatus) = SessionRecord(
         id = "s1",
         revision = revision,

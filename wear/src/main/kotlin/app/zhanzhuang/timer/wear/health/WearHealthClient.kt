@@ -18,6 +18,9 @@ sealed interface WearHealthUpdate {
 sealed interface WearHealthStartResult {
     data object Started : WearHealthStartResult
 
+    /** Exercise started, but heart-rate callback registration failed and cleanup must be retried via [WearHealthClient.end]. */
+    data class StartedWithoutUpdates(val reason: DurationOnlyReason) : WearHealthStartResult
+
     /** The timer can proceed, but there is no app-owned Health Services exercise or heart rate. */
     data class DurationOnly(val reason: DurationOnlyReason) : WearHealthStartResult
 }

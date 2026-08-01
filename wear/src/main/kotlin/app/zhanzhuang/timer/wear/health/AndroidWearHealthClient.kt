@@ -56,6 +56,7 @@ class AndroidWearHealthClient(
 
     override suspend fun start(): WearHealthStartResult {
         ownsExercise = false
+        var startedExerciseInThisCall = false
         try {
             val info = exerciseClient.getCurrentExerciseInfo()
             val existingExercise = info.toExistingExercise()
@@ -65,6 +66,10 @@ class AndroidWearHealthClient(
 
             if (existingExercise == ExistingExercise.NONE) {
                 exerciseClient.startExercise(createExerciseConfig())
+                ownsExercise = true
+                startedExerciseInThisCall = true
+            } else if (existingExercise == ExistingExercise.OWNED) {
+                ownsExercise = true
             }
             exerciseClient.setUpdateCallback(callback)
             ownsExercise = true
@@ -72,9 +77,40 @@ class AndroidWearHealthClient(
         } catch (error: CancellationException) {
             throw error
         } catch (error: SecurityException) {
-            return WearHealthStartResult.DurationOnly(DurationOnlyReason.PERMISSION_DENIED)
+            return afterCallbackRegistrationFailure(
+                DurationOnlyReason.PERMISSION_DENIED,
+                startedExerciseInThisCall,
+            )
         } catch (error: HealthServicesException) {
-            return WearHealthStartResult.DurationOnly(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE)
+            return afterCallbackRegistrationFailure(
+                DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE,
+                startedExerciseInThisCall,
+            )
+        }
+    }
+
+    private suspend fun afterCallbackRegistrationFailure(
+        reason: DurationOnlyReason,
+        startedExerciseInThisCall: Boolean,
+    ): WearHealthStartResult {
+        if (!startedExerciseInThisCall) {
+            return if (ownsExercise) {
+                WearHealthStartResult.StartedWithoutUpdates(reason)
+            } else {
+                WearHealthStartResult.DurationOnly(reason)
+            }
+        }
+
+        return try {
+            exerciseClient.endExercise()
+            ownsExercise = false
+            WearHealthStartResult.DurationOnly(reason)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: SecurityException) {
+            WearHealthStartResult.StartedWithoutUpdates(reason)
+        } catch (error: HealthServicesException) {
+            WearHealthStartResult.StartedWithoutUpdates(reason)
         }
     }
 

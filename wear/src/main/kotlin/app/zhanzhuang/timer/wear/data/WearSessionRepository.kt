@@ -9,6 +9,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import app.zhanzhuang.timer.model.HeartRateSample
 import app.zhanzhuang.timer.model.SampleAccuracy
 import app.zhanzhuang.timer.model.SessionConfig
@@ -58,8 +59,11 @@ interface WearSessionDao {
     @Query("SELECT * FROM wear_heart_rate_samples WHERE sessionId = :sessionId ORDER BY epochMillis")
     suspend fun samples(sessionId: String): List<WearHeartRateEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveSession(entity: WearSessionEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSession(entity: WearSessionEntity): Long
+
+    @Update
+    suspend fun updateSession(entity: WearSessionEntity): Int
 
     @Query("DELETE FROM wear_heart_rate_samples WHERE sessionId = :sessionId")
     suspend fun clearSamples(sessionId: String)
@@ -84,7 +88,12 @@ interface WearSessionDao {
         val existing = session(record.id)
         if (existing != null && record.revision <= existing.revision) return
 
-        saveSession(record.toWearEntity())
+        val updated = record.toWearEntity()
+        if (existing == null) {
+            insertSession(updated)
+        } else {
+            updateSession(updated)
+        }
         clearSamples(record.id)
         if (record.heartRateSamples.isNotEmpty()) {
             saveSamples(record.heartRateSamples.map { it.toWearEntity(record.id) })
