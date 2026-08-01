@@ -16,34 +16,89 @@ import app.zhanzhuang.timer.mobile.data.MobileDatabase
 import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
 import app.zhanzhuang.timer.model.SessionConfig
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal data class MobileSessionServiceDependencies(
+    val controllerFactory: (Context) -> MobileSessionController,
+    val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    val hostFactory: ((MobileSessionService) -> MobileForegroundServiceHost)? = null,
+)
 
 class MobileSessionService : Service() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private lateinit var serviceScope: CoroutineScope
     private lateinit var runtime: MobileSessionServiceRuntime
+    private val actionMutex = Mutex()
     private var tickJob: Job? = null
+    internal var lastActionJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
-        val controller = DefaultMobileSessionController(
-            repository = MobileSessionRepository(
-                Room.databaseBuilder(applicationContext, MobileDatabase::class.java, DATABASE_NAME)
-                    .addMigrations(MobileDatabase.MIGRATION_1_2)
-                    .build(),
-            ),
-            elapsedClock = ElapsedClock { SystemClock.elapsedRealtime() },
-            wallClock = WallClock { System.currentTimeMillis() },
-            haptics = AndroidMobileHaptics(getSystemService(Vibrator::class.java)),
-        )
+        val dependencies = testDependencies ?: defaultDependencies()
+        serviceScope = CoroutineScope(SupervisorJob() + dependencies.dispatcher)
+        val controller = dependencies.controllerFactory(applicationContext)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, notification())
-        runtime = MobileSessionServiceRuntime(controller, object : MobileForegroundServiceHost {
+        runtime = MobileSessionServiceRuntime(
+            controller,
+            dependencies.hostFactory?.invoke(this) ?: foregroundServiceHost(),
+        )
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastActionJob = serviceScope.launch {
+            actionMutex.withLock {
+                when (intent?.action) {
+                    ACTION_START -> {
+                        if (!runtime.recover(tearDownWhenInactive = false)) {
+                            runtime.start(
+                                SessionConfig(
+                                    intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
+                                    intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
+                                ),
+                            )
+                        }
+                    }
+                    ACTION_PAUSE -> {
+                        runtime.recover()
+                        runtime.pause()
+                    }
+                    ACTION_RESUME -> {
+                        runtime.recover()
+                        runtime.resume()
+                    }
+                    ACTION_FINISH -> {
+                        runtime.recover()
+                        runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false))
+                    }
+                    null -> runtime.recover()
+                    else -> runtime.recover()
+                }
+            }
+        }
+        return when (intent?.action) {
+            null, ACTION_START, ACTION_PAUSE, ACTION_RESUME -> START_STICKY
+            else -> START_NOT_STICKY
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        tickJob?.cancel()
+        serviceScope.cancel()
+        super.onDestroy()
+    }
+
+    private fun foregroundServiceHost() = object : MobileForegroundServiceHost {
             override fun startTicker() {
                 if (tickJob?.isActive == true) return
                 tickJob = serviceScope.launch {
@@ -66,38 +121,22 @@ class MobileSessionService : Service() {
             override fun stopSelf() {
                 this@MobileSessionService.stopSelf()
             }
-        })
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START -> serviceScope.launch {
-                runtime.start(
-                    SessionConfig(
-                        intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
-                        intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
-                    ),
-                )
-            }
-            ACTION_PAUSE -> serviceScope.launch { runtime.pause() }
-            ACTION_RESUME -> serviceScope.launch { runtime.resume() }
-            ACTION_FINISH -> serviceScope.launch { runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false)) }
-            null -> serviceScope.launch { runtime.recover() }
-            else -> serviceScope.launch { runtime.recover() }
-        }
-        return when (intent?.action) {
-            null, ACTION_START, ACTION_PAUSE, ACTION_RESUME -> START_STICKY
-            else -> START_NOT_STICKY
-        }
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onDestroy() {
-        tickJob?.cancel()
-        serviceScope.cancel()
-        super.onDestroy()
-    }
+    private fun defaultDependencies() = MobileSessionServiceDependencies(
+        controllerFactory = { context ->
+            DefaultMobileSessionController(
+                repository = MobileSessionRepository(
+                    Room.databaseBuilder(context, MobileDatabase::class.java, DATABASE_NAME)
+                        .addMigrations(MobileDatabase.MIGRATION_1_2)
+                        .build(),
+                ),
+                elapsedClock = ElapsedClock { SystemClock.elapsedRealtime() },
+                wallClock = WallClock { System.currentTimeMillis() },
+                haptics = AndroidMobileHaptics(context.getSystemService(Vibrator::class.java)),
+            )
+        },
+    )
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
@@ -125,6 +164,8 @@ class MobileSessionService : Service() {
         const val EXTRA_DURATION_MINUTES = "duration_minutes"
         const val EXTRA_INTERVAL_MINUTES = "interval_minutes"
         const val EXTRA_CANCELLED = "cancelled"
+
+        internal var testDependencies: MobileSessionServiceDependencies? = null
 
         fun start(context: Context, config: SessionConfig) {
             val intent = Intent(context, MobileSessionService::class.java)

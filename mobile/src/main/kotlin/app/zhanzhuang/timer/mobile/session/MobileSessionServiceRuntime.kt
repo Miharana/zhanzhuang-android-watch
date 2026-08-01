@@ -14,9 +14,10 @@ class MobileSessionServiceRuntime(
     private val controller: MobileSessionController,
     private val host: MobileForegroundServiceHost,
 ) {
-    suspend fun recover() {
-        controller.recover()
-        synchronizeService()
+    suspend fun recover(tearDownWhenInactive: Boolean = true): Boolean {
+        val recovered = controller.recover()
+        if (recovered || tearDownWhenInactive) synchronizeService()
+        return recovered
     }
 
     suspend fun start(config: SessionConfig) {

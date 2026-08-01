@@ -46,6 +46,19 @@ class MobileSessionControllerTest {
     }
 
     @Test
+    fun recoveredAcknowledgedIntervalDoesNotVibrateAgain() = runTest {
+        controller.start(SessionConfig(15, 5))
+        elapsed.advanceBy(300_000)
+        controller.tick()
+        val recovered = DefaultMobileSessionController(repository, elapsed, wall, haptics)
+
+        assertTrue(recovered.recover())
+        recovered.tick()
+
+        assertEquals(1, haptics.intervalCount)
+    }
+
+    @Test
     fun sameBootRunningSessionRecoversFromMonotonicAnchor() = runTest {
         controller.start(SessionConfig(15, 5))
         elapsed.advanceBy(120_000)
