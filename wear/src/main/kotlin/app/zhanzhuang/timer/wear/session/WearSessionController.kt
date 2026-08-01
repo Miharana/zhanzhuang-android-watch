@@ -7,6 +7,9 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SyncEnvelope
+import app.zhanzhuang.timer.model.SyncPayload
+import app.zhanzhuang.timer.model.SyncWireCodec
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.health.DurationOnlyReason
 import app.zhanzhuang.timer.wear.health.WearHealthClient
@@ -388,7 +391,15 @@ class WearSessionControllerImpl(
         )
     }
 
-    private fun SessionRecord.toOutboxPayload(): String = "{\"id\":\"$id\",\"revision\":$revision,\"status\":\"$status\"}"
+    private fun SessionRecord.toOutboxPayload(eventId: String): String = SyncWireCodec.encodeCompletedForOutbox(
+        SyncEnvelope(
+            eventId = eventId,
+            sessionId = id,
+            revision = revision,
+            sentAtEpochMillis = clock.epochMillis(),
+            payload = SyncPayload.Completed(this),
+        ),
+    )
 
     private fun applyStartResult(result: WearHealthStartResult) {
         when (result) {
@@ -403,7 +414,8 @@ class WearSessionControllerImpl(
         record = record!!.copy(revision = record!!.revision + 1)
         saveSnapshotOnly(snapshotBootId)
         val complete = record!!
-        records.completeWithOutbox(complete, unflushedSamples.toList(), "${complete.id}:${complete.revision}", complete.toOutboxPayload())
+        val eventId = "${complete.id}:${complete.revision}"
+        records.completeWithOutbox(complete, unflushedSamples.toList(), eventId, complete.toOutboxPayload(eventId))
         unflushedSamples.clear()
         saveSnapshotOnly(snapshotBootId)
         lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
@@ -414,7 +426,8 @@ class WearSessionControllerImpl(
     private suspend fun repairTerminalDurability(snapshotBootId: String) {
         val terminal = record!!
         if (terminal.status == SessionStatus.COMPLETED) {
-            records.completeWithOutbox(terminal, unflushedSamples.toList(), "${terminal.id}:${terminal.revision}", terminal.toOutboxPayload())
+            val eventId = "${terminal.id}:${terminal.revision}"
+            records.completeWithOutbox(terminal, unflushedSamples.toList(), eventId, terminal.toOutboxPayload(eventId))
         } else {
             records.checkpoint(terminal, unflushedSamples.toList())
         }

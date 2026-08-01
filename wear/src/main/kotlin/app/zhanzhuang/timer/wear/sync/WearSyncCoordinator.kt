@@ -1,0 +1,126 @@
+package app.zhanzhuang.timer.wear.sync
+
+import app.zhanzhuang.timer.domain.SyncConflictResolver
+import app.zhanzhuang.timer.model.PROTOCOL_VERSION
+import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SyncEnvelope
+import app.zhanzhuang.timer.model.SyncPayload
+import app.zhanzhuang.timer.model.SyncTransport
+import app.zhanzhuang.timer.wear.data.OutboxEntity
+import app.zhanzhuang.timer.wear.data.WearSessionRepository
+import java.util.UUID
+
+data class OutboxEntry(
+    val eventId: String,
+    val sessionId: String,
+    val revision: Long,
+    val envelope: SyncEnvelope,
+)
+
+interface WearCompletionOutbox {
+    suspend fun pendingCompleted(): List<OutboxEntry>
+    suspend fun acknowledge(eventId: String, revision: Long)
+}
+
+interface WearSyncController {
+    suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord
+    suspend fun current(): SessionRecord?
+    suspend fun session(sessionId: String): SessionRecord?
+    suspend fun pauseFromRemote(): SessionRecord?
+    suspend fun resumeFromRemote(): SessionRecord?
+    suspend fun finishFromRemote(cancelled: Boolean): SessionRecord?
+    suspend fun mergeRemote(record: SessionRecord): SessionRecord
+}
+
+/** Wear-side command receiver and durable completion retransmitter. */
+class WearSyncCoordinator(
+    private val outbox: WearCompletionOutbox,
+    private val transport: SyncTransport,
+    private val controller: WearSyncController? = null,
+    private val nowEpochMillis: () -> Long = { System.currentTimeMillis() },
+    private val resolver: SyncConflictResolver = SyncConflictResolver(),
+) {
+    private val seenEventIds = LinkedHashSet<String>()
+
+    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean {
+        if (!acceptEnvelope(envelope)) return false
+        return when (val payload = envelope.payload) {
+            is SyncPayload.Ack -> acknowledge(envelope.eventId, payload.acceptedRevision)
+            is SyncPayload.Start -> {
+                if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
+                if (isLowerRevision(envelope)) return false
+                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it) } != null
+            }
+            SyncPayload.QueryState -> controller?.current()?.let { sendState(it) } != null
+            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote()?.let { sendState(it) } != null
+            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote()?.let { sendState(it) } != null
+            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(payload.cancelled)?.let { sendState(it) } != null
+            is SyncPayload.CancelIfUnowned -> {
+                val current = controller?.current() ?: return false
+                if (current.revision <= payload.ownerRevision) controller.finishFromRemote(cancelled = true)?.let { sendState(it) } != null else false
+            }
+            is SyncPayload.State -> mergeRemote(payload.record)
+            is SyncPayload.Completed -> mergeRemote(payload.record)
+        }
+    }
+
+    suspend fun resendCompleted() {
+        outbox.pendingCompleted().forEach { entry ->
+            transport.putCompleted(entry.envelope)
+        }
+    }
+
+    private suspend fun acknowledge(eventId: String, revision: Long): Boolean {
+        val matching = outbox.pendingCompleted().any { it.eventId == eventId && it.revision == revision }
+        if (!matching) return false
+        outbox.acknowledge(eventId, revision)
+        return true
+    }
+
+    private suspend fun mergeRemote(incoming: SessionRecord): Boolean {
+        val activeController = controller ?: return false
+        val winner = resolver.merge(activeController.session(incoming.id), incoming)
+        if (winner != incoming) return false
+        activeController.mergeRemote(winner)
+        return true
+    }
+
+    private suspend fun sendState(record: SessionRecord): Boolean = transport.sendMessage(
+        SyncEnvelope(
+            eventId = UUID.randomUUID().toString(),
+            sessionId = record.id,
+            revision = record.revision,
+            sentAtEpochMillis = nowEpochMillis(),
+            payload = SyncPayload.State(record),
+        ),
+    )
+
+    private fun acceptEnvelope(envelope: SyncEnvelope): Boolean {
+        if (envelope.protocolVersion != PROTOCOL_VERSION || envelope.eventId.isBlank()) return false
+        if (!seenEventIds.add(envelope.eventId)) return false
+        while (seenEventIds.size > MAX_SEEN_EVENTS) seenEventIds.remove(seenEventIds.first())
+        return true
+    }
+
+    private suspend fun isLowerRevision(envelope: SyncEnvelope): Boolean =
+        controller?.session(envelope.sessionId)?.let { envelope.revision < it.revision } ?: false
+
+    private companion object {
+        const val MAX_SEEN_EVENTS = 512
+    }
+}
+
+/** Adapts the Task 4 outbox to typed protocol envelopes without exposing Room to the service. */
+class WearRepositoryCompletionOutbox(private val repository: WearSessionRepository) : WearCompletionOutbox {
+    override suspend fun pendingCompleted(): List<OutboxEntry> = repository.pendingOutbox().mapNotNull { entity ->
+        entity.toOutboxEntryOrNull()
+    }
+
+    override suspend fun acknowledge(eventId: String, revision: Long) = repository.acknowledge(eventId, revision)
+}
+
+private fun OutboxEntity.toOutboxEntryOrNull(): OutboxEntry? = runCatching {
+    val envelope = app.zhanzhuang.timer.model.SyncWireCodec.decodeCompletedFromOutbox(payload)
+    OutboxEntry(eventId, sessionId, revision, envelope)
+}.getOrNull()

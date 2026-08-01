@@ -1,0 +1,160 @@
+package app.zhanzhuang.timer.mobile.sync
+
+import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionOwner
+import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SyncEnvelope
+import app.zhanzhuang.timer.model.SyncPayload
+import app.zhanzhuang.timer.model.SyncTransport
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class MobileSyncCoordinatorTest {
+    @Test
+    fun fallbackOccursAfterAckThenQueryTimeout() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(
+            transport = transport,
+            controller = controller,
+            scope = TestScope(StandardTestDispatcher(testScheduler)),
+            nowEpochMillis = { testScheduler.currentTime },
+        )
+
+        coordinator.startFromMobile(SessionConfig())
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(listOf("START", "QUERY_STATE"), transport.sentPayloadNames)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(SessionOwner.MOBILE, controller.owner())
+    }
+
+    @Test
+    fun duplicateAndExpiredStartAreSafelyRejected() = runTest {
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(
+            transport = FakeTransport(),
+            controller = controller,
+            scope = this,
+            nowEpochMillis = { 10_000L },
+        )
+        val expired = envelope(
+            eventId = "old",
+            revision = 1,
+            payload = SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 9_999),
+        )
+
+        assertFalse(coordinator.receiveCommand(expired))
+        assertFalse(coordinator.receiveCommand(expired))
+        assertEquals(0, controller.remoteStarts)
+    }
+
+    @Test
+    fun completedEventAcknowledgesItsExactRevision() = runTest {
+        val transport = FakeTransport()
+        val coordinator = MobileSyncCoordinator(transport, FakeController(), this, nowEpochMillis = { 10_000L })
+        val completion = envelope("completion-1", 4, SyncPayload.Completed(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED)))
+
+        assertTrue(coordinator.receiveCompleted(completion))
+        assertEquals("ACK", transport.sentPayloadNames.single())
+    }
+
+    @Test
+    fun alreadyPersistedCompletionIsAcknowledgedAfterProcessRestart() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also {
+            it.mergeRemote(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED))
+        }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 10_000L })
+
+        assertTrue(coordinator.receiveCompleted(envelope("completion-1", 4, SyncPayload.Completed(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED)))) )
+        assertEquals("ACK", transport.sentPayloadNames.single())
+    }
+
+    @Test
+    fun lowerRevisionStateCannotReplaceCurrentOwner() = runTest {
+        val controller = FakeController().also {
+            it.mergeRemote(record(SessionOwner.MOBILE).copy(revision = 5))
+        }
+        val coordinator = MobileSyncCoordinator(FakeTransport(), controller, this, nowEpochMillis = { 10_000L })
+
+        assertFalse(coordinator.receiveCommand(envelope("delayed-state", 4, SyncPayload.State(record(SessionOwner.WEAR).copy(revision = 4)))))
+        assertEquals(SessionOwner.MOBILE, controller.owner())
+    }
+
+    private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
+        eventId = eventId,
+        sessionId = "session-1",
+        revision = revision,
+        sentAtEpochMillis = 1_000,
+        payload = payload,
+    )
+
+    private class FakeTransport : SyncTransport {
+        val sentPayloadNames = mutableListOf<String>()
+
+        override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
+            sentPayloadNames += envelope.payload::class.simpleName!!.replace("QueryState", "QUERY_STATE").uppercase()
+            return true
+        }
+
+        override suspend fun putCompleted(envelope: SyncEnvelope): Boolean = true
+    }
+
+    private class FakeController : MobileSyncController {
+        private var record = record(owner = SessionOwner.WEAR)
+        var remoteStarts = 0
+
+        override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord {
+            remoteStarts++
+            return record.copy(config = config, id = sessionId, revision = revision, owner = SessionOwner.MOBILE)
+                .also { record = it }
+        }
+
+        override suspend fun startFromMobile(config: SessionConfig, sessionId: String, revision: Long): SessionRecord =
+            record.copy(config = config, id = sessionId, revision = revision, owner = SessionOwner.MOBILE)
+                .also { record = it }
+
+        override suspend fun current(): SessionRecord? = record
+
+        override suspend fun session(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }
+
+        override suspend fun pauseFromRemote(): SessionRecord? = record.copy(status = SessionStatus.PAUSED).also { record = it }
+
+        override suspend fun resumeFromRemote(): SessionRecord? = record.copy(status = SessionStatus.RUNNING).also { record = it }
+
+        override suspend fun finishFromRemote(cancelled: Boolean): SessionRecord? = record.copy(
+            status = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED,
+        ).also { record = it }
+
+        override suspend fun becomeMobileOwner(sessionId: String): SessionRecord? =
+            record.takeIf { it.id == sessionId }?.copy(owner = SessionOwner.MOBILE, revision = record.revision + 1)
+                ?.also { record = it }
+
+        override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record.also { this.record = it }
+
+        fun owner(): SessionOwner = record.owner
+    }
+
+    private companion object {
+        fun record(owner: SessionOwner) = SessionRecord(
+            id = "session-1",
+            revision = 1,
+            config = SessionConfig(),
+            status = SessionStatus.RUNNING,
+            owner = owner,
+            startEpochMillis = 1_000,
+        )
+    }
+}
