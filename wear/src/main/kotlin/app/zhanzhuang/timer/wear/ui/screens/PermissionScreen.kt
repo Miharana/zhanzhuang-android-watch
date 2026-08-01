@@ -7,16 +7,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.Text
-import app.zhanzhuang.timer.wear.ui.theme.DeepSoil
-import app.zhanzhuang.timer.wear.ui.theme.GoldHighlight
-import app.zhanzhuang.timer.wear.ui.theme.WarmPaper
+import androidx.wear.compose.material3.MaterialTheme
 
 @Composable
 fun PermissionScreen(onAllow: () -> Unit, onContinueWithoutHeartRate: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize().background(DeepSoil), contentAlignment = Alignment.Center) {
+    val colors = MaterialTheme.colorScheme
+    Box(modifier = modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
         ScreenColumn {
-            Text("Heart rate is optional", color = GoldHighlight)
-            Text("Allow access to show it during this session.", color = WarmPaper)
+            Text("Heart rate is optional", color = colors.primaryContainer)
+            Text("Allow access to show it during this session.", color = colors.onBackground)
             GoldAction("Allow heart rate", onClick = onAllow)
             SoilAction("Continue without", "Continue without heart rate", onContinueWithoutHeartRate)
         }

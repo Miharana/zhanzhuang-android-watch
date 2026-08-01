@@ -1,6 +1,13 @@
 package app.zhanzhuang.timer.wear.ui
 
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.wear.ui.screens.completionLabel
+import app.zhanzhuang.timer.wear.ui.theme.DeepGold
+import app.zhanzhuang.timer.wear.ui.theme.DeepSoil
+import app.zhanzhuang.timer.wear.ui.theme.ReflectiveGold
+import app.zhanzhuang.timer.wear.ui.theme.WarmPaper
+import app.zhanzhuang.timer.wear.ui.theme.ZhanZhuangColorScheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,5 +40,19 @@ class WearUiStateTest {
         assertEquals("30:00", formatWearDuration(30 * 60_000L))
         assertEquals("00:05", formatWearDuration(5_000L))
         assertEquals("00:00", formatWearDuration(-1L))
+    }
+
+    @Test fun completionLabelTellsTheTruthForEveryTerminalStatus() {
+        assertEquals("Completed", completionLabel(SessionStatus.COMPLETED))
+        assertEquals("Cancelled", completionLabel(SessionStatus.CANCELLED))
+        assertEquals("Interrupted", completionLabel(SessionStatus.INTERRUPTED))
+    }
+
+    @Test fun themeMapsEarthAndGoldTokensToWearSemanticRoles() {
+        assertEquals(ReflectiveGold, ZhanZhuangColorScheme.primary)
+        assertEquals(DeepSoil, ZhanZhuangColorScheme.onPrimary)
+        assertEquals(DeepSoil, ZhanZhuangColorScheme.background)
+        assertEquals(WarmPaper, ZhanZhuangColorScheme.onBackground)
+        assertEquals(DeepGold, ZhanZhuangColorScheme.outline)
     }
 }

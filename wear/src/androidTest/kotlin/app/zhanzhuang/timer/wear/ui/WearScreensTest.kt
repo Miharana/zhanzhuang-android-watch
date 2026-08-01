@@ -12,6 +12,7 @@ import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.session.WearSessionUiState
 import app.zhanzhuang.timer.wear.ui.screens.ActiveSessionScreen
+import app.zhanzhuang.timer.wear.ui.screens.CompletionScreen
 import app.zhanzhuang.timer.wear.ui.screens.SetupScreen
 import app.zhanzhuang.timer.wear.ui.theme.ZhanZhuangWearTheme
 import org.junit.Rule
@@ -49,10 +50,25 @@ class WearScreensTest {
         assertTrue(cancelled)
     }
 
+    @Test fun cancelledSessionIsNotSemanticallyAnnouncedAsCompleted() {
+        rule.setContent {
+            ZhanZhuangWearTheme { CompletionScreen(terminalState(SessionStatus.CANCELLED), {}) }
+        }
+
+        rule.onNodeWithText("Cancelled").assertIsDisplayed()
+    }
+
     private fun runningState() = WearSessionUiState(
         record = SessionRecord(status = SessionStatus.RUNNING, owner = SessionOwner.WEAR),
         remainingMs = 30 * 60_000L,
         currentHeartRateBpm = null,
         nextReminderAtActiveMs = 10 * 60_000L,
+    )
+
+    private fun terminalState(status: SessionStatus) = WearSessionUiState(
+        record = SessionRecord(status = status, owner = SessionOwner.WEAR, activeDurationMs = 15 * 60_000L),
+        remainingMs = 0,
+        currentHeartRateBpm = null,
+        nextReminderAtActiveMs = null,
     )
 }

@@ -31,10 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
-import app.zhanzhuang.timer.wear.ui.theme.DeepGold
-import app.zhanzhuang.timer.wear.ui.theme.RaisedSoil
-import app.zhanzhuang.timer.wear.ui.theme.ReflectiveGold
-import app.zhanzhuang.timer.wear.ui.theme.WarmPaper
+import androidx.wear.compose.material3.MaterialTheme
 
 internal val RoundScreenPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
 
@@ -63,7 +60,8 @@ internal fun GoldAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val color = if (enabled) ReflectiveGold else DeepGold
+    val colors = MaterialTheme.colorScheme
+    val color = if (enabled) colors.primary else colors.primaryDim
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -74,23 +72,24 @@ internal fun GoldAction(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = RaisedSoil, fontWeight = FontWeight.Bold)
+        Text(label, color = colors.onPrimary, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 internal fun SoilAction(label: String, contentDescription: String = label, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .fillMaxWidth()
             .sizeIn(minHeight = 48.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(RaisedSoil)
-            .border(1.dp, DeepGold, RoundedCornerShape(24.dp))
+            .background(colors.surfaceContainer)
+            .border(1.dp, colors.outline, RoundedCornerShape(24.dp))
             .semantics { this.contentDescription = contentDescription; role = Role.Button }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = WarmPaper)
+        Text(label, color = colors.onSurface)
     }
 }

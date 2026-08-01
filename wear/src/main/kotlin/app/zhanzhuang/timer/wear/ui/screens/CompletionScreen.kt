@@ -8,19 +8,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.MaterialTheme
+import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.session.WearSessionUiState
 import app.zhanzhuang.timer.wear.ui.formatWearDuration
-import app.zhanzhuang.timer.wear.ui.theme.DeepSoil
-import app.zhanzhuang.timer.wear.ui.theme.GoldHighlight
-import app.zhanzhuang.timer.wear.ui.theme.WarmPaper
+
+fun completionLabel(status: SessionStatus?): String = when (status) {
+    SessionStatus.COMPLETED -> "Completed"
+    SessionStatus.CANCELLED -> "Cancelled"
+    SessionStatus.INTERRUPTED -> "Interrupted"
+    else -> "Session ended"
+}
 
 @Composable
 fun CompletionScreen(state: WearSessionUiState, onDone: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize().background(DeepSoil), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         ScreenColumn {
-            Text("Complete", color = GoldHighlight, fontWeight = FontWeight.Bold)
-            Text(formatWearDuration(state.record?.activeDurationMs ?: 0L), color = WarmPaper)
-            state.currentHeartRateBpm?.let { Text("Last heart rate ${it.toInt()} bpm", color = GoldHighlight) }
+            Text(completionLabel(state.record?.status), color = MaterialTheme.colorScheme.primaryContainer, fontWeight = FontWeight.Bold)
+            Text(formatWearDuration(state.record?.activeDurationMs ?: 0L), color = MaterialTheme.colorScheme.onBackground)
+            state.currentHeartRateBpm?.let { Text("Last heart rate ${it.toInt()} bpm", color = MaterialTheme.colorScheme.primaryContainer) }
             GoldAction("Done", onClick = onDone)
         }
     }
