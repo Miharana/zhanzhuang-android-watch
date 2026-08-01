@@ -269,3 +269,11 @@ Result: no forbidden manifest matches.
 - An app-owned existing exercise becomes recoverable immediately after status observation. This covers permission and Health Services failures plus cancellation before callback registration.
 - `StartedWithoutUpdates` honestly signals that an app-owned exercise remains active without usable heart-rate updates; callers can call `end()` to recover it.
 - A fresh no-exercise path still owns an exercise only after `startExercise()` succeeds. Unsupported heart rate or capability failure before that remains `DurationOnly`.
+
+## Final commits and review gate
+
+- `6f93e1f feat: add Wear health and haptic foundation`
+- `5078ac2 fix: preserve Wear outbox and exercise ownership`
+- `19d2246 fix: retain Wear ownership through capability lookup`
+
+Independent review was run after the implementation and each corrective pass. The final review approved spec compliance and code quality with no remaining Critical, Important, or Minor findings.
