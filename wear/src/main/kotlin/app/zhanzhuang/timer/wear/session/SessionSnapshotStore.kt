@@ -33,7 +33,7 @@ class SharedPreferencesSessionSnapshotStore(
     private val preferences: SharedPreferences,
 ) : SessionSnapshotStore {
     override suspend fun save(snapshot: WearSessionSnapshot) {
-        preferences.edit().putString(KEY, snapshot.toJson().toString()).commit()
+        check(preferences.edit().putString(KEY, snapshot.toJson().toString()).commit()) { "Wear session snapshot commit failed" }
     }
 
     override suspend fun load(): WearSessionSnapshot? = preferences.getString(KEY, null)?.let { encoded ->
@@ -57,15 +57,8 @@ class SharedPreferencesSessionSnapshotStore(
         put("endEpochMillis", record.endEpochMillis)
         put("activeDurationMs", record.activeDurationMs)
         put("pausedDurationMs", record.pausedDurationMs)
-        put("samples", JSONArray().apply {
-            record.heartRateSamples.forEach { sample ->
-                put(JSONObject().apply {
-                    put("epochMillis", sample.epochMillis)
-                    put("bpm", sample.bpm)
-                    put("accuracy", sample.accuracy.name)
-                })
-            }
-        })
+        // Samples are batched to Room; snapshots intentionally never rewrite a growing HR history.
+        put("samples", JSONArray())
     }
 
     private fun JSONObject.toSnapshot(): WearSessionSnapshot {

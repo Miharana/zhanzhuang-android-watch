@@ -53,17 +53,6 @@ class WearSessionService : Service() {
         notification = OngoingSessionNotification(applicationContext)
         commands = WearSessionCommandProcessor(controller)
         serviceScope.launch {
-            controller.state.collect { state ->
-                if (state.record?.status in ACTIVE_STATUSES) {
-                    // Never promote null/terminal states back to foreground from this asynchronous observer.
-                    getSystemService(NotificationManager::class.java).notify(
-                        OngoingSessionNotification.NOTIFICATION_ID,
-                        notification.build(state, statusIntent()),
-                    )
-                }
-            }
-        }
-        serviceScope.launch {
             health.updates.collect { update -> controller.acceptHealthUpdate(update) }
         }
         serviceScope.launch {
@@ -72,7 +61,7 @@ class WearSessionService : Service() {
                     processRequest(request)
                 } catch (error: CancellationException) {
                     throw error
-                } catch (_: Throwable) {
+                } catch (_: Exception) {
                     // The controller has already durably recorded its pending external operation.
                     // Keep this actor alive so STATUS (or the next explicit action) can retry recovery.
                 }
@@ -121,16 +110,22 @@ class WearSessionService : Service() {
         when (request) {
             is ServiceRequest.Command -> when (commands.process(request.command, currentBootId(applicationContext))) {
                 ServiceCommandResult.ACTIVE -> {
-                    startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
+                    publishForeground(request.generation)
                     startTicker(request.startId, request.generation)
                 }
                 ServiceCommandResult.STOP, ServiceCommandResult.REJECTED -> stopIfCurrent(request.startId, request.generation)
             }
             is ServiceRequest.Tick -> if (request.generation == generation) {
                 controller.tick()
+                publishForeground(request.generation)
                 if (controller.state.value.record?.status in TERMINAL_STATUSES) stopIfCurrent(request.startId, request.generation)
             }
         }
+    }
+
+    private fun publishForeground(requestGeneration: Long) {
+        if (requestGeneration != generation || controller.state.value.record?.status !in ACTIVE_STATUSES) return
+        startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
     }
 
     private sealed interface ServiceRequest {
@@ -204,12 +199,14 @@ class WearSessionService : Service() {
             else -> null
         }
 
-        fun currentBootId(context: Context): String = runCatching {
-            File("/proc/sys/kernel/random/boot_id").readText().trim().takeIf { it.isNotEmpty() }
+        private val fallbackBootId: String by lazy {
+            "unavailable:${android.os.Process.myPid()}:${android.os.SystemClock.elapsedRealtime()}"
+        }
+        fun currentBootId(context: Context, readBootId: () -> String = { File("/proc/sys/kernel/random/boot_id").readText().trim() }): String = runCatching {
+            readBootId().takeIf { it.isNotEmpty() }
                 ?: error("empty kernel boot id")
         }.getOrElse {
-            // A process-unique fallback is conservative: it interrupts rather than fabricating elapsed time.
-            "unavailable:${android.os.Process.myPid()}:${android.os.SystemClock.elapsedRealtime()}"
+            fallbackBootId
         }
     }
 }

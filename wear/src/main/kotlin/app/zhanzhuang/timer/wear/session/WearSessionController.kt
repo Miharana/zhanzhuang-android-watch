@@ -182,16 +182,22 @@ class WearSessionControllerImpl(
             is WearHealthUpdate.HeartRate -> {
                 val active = record?.takeIf { it.status == SessionStatus.RUNNING && healthExerciseOwned } ?: return
                 if (update.bpm !in MIN_HEART_RATE..MAX_HEART_RATE) return
+                val nowElapsed = clock.elapsedRealtimeMs()
+                val lowerBound = runningSinceBootMs ?: nowElapsed
+                if (update.timeSinceBootMs !in lowerBound..nowElapsed) return
+                val epoch = try {
+                    Math.addExact(Math.subtractExact(clock.epochMillis(), nowElapsed), update.timeSinceBootMs)
+                } catch (_: ArithmeticException) { return }
+                if (epoch !in (active.startEpochMillis ?: epoch)..clock.epochMillis()) return
                 val sample = HeartRateSample(
-                    epochMillis = (clock.epochMillis() - clock.elapsedRealtimeMs() + update.timeSinceBootMs),
+                    epochMillis = epoch,
                     bpm = update.bpm,
                     accuracy = SampleAccuracy.HIGH,
                 )
                 record = active.copy(heartRateSamples = active.heartRateSamples + sample)
                 currentHeartRateBpm = update.bpm
                 samplesSinceStore += 1
-                // The snapshot contains every sample immediately; database writes are batched at 30s/20 samples.
-                saveSnapshotOnly()
+                // Room owns samples; no synchronous growing SharedPreferences history write on callback.
                 if (samplesSinceStore >= SAMPLE_BATCH_COUNT || clock.elapsedRealtimeMs() - lastStoredSampleAtBootMs >= SAMPLE_BATCH_INTERVAL_MS) {
                     persistSnapshotAndRecord()
                 } else {

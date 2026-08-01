@@ -252,9 +252,10 @@ class WearSessionControllerTest {
             RecordingStore(), RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(),
         )
         controller.start(SessionConfig(15, 5), "s1")
-        controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(63.0, timeSinceBootMs = 125))
+        clock.advanceBy(25)
+        controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(63.0, timeSinceBootMs = 525))
 
-        assertEquals(1_125, controller.state.value.record!!.heartRateSamples.single().epochMillis)
+        assertEquals(1_525, controller.state.value.record!!.heartRateSamples.single().epochMillis)
         controller.pause()
         controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(64.0, timeSinceBootMs = 200))
         assertEquals(1, controller.state.value.record!!.heartRateSamples.size)
