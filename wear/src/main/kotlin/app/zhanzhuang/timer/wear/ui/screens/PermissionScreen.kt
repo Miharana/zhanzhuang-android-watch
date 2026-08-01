@@ -6,18 +6,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
+import app.zhanzhuang.timer.wear.R
 
 @Composable
 fun PermissionScreen(onAllow: () -> Unit, onContinueWithoutHeartRate: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Box(modifier = modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
         ScreenColumn {
-            Text("Heart rate is optional", color = colors.primaryContainer)
-            Text("Allow access to show it during this session.", color = colors.onBackground)
-            GoldAction("Allow heart rate", onClick = onAllow)
-            SoilAction("Continue without", "Continue without heart rate", onContinueWithoutHeartRate)
+            Text(stringResource(R.string.heart_rate_optional), color = colors.primaryContainer)
+            Text(stringResource(R.string.heart_rate_permission_info), color = colors.onBackground)
+            GoldAction(stringResource(R.string.allow_heart_rate), onClick = onAllow)
+            SoilAction(stringResource(R.string.continue_without), stringResource(R.string.continue_without_heart_rate), onContinueWithoutHeartRate)
         }
     }
 }

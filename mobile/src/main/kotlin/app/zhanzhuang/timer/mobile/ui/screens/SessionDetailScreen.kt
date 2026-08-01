@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.model.HeartRateSample
 import app.zhanzhuang.timer.model.SessionRecord
 import java.time.Instant
@@ -24,14 +26,14 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SessionDetailScreen(record: SessionRecord, onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back") }
-        Text("Session detail", style = MaterialTheme.typography.headlineMedium)
+        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.back)) }
+        Text(stringResource(R.string.session_detail), style = MaterialTheme.typography.headlineMedium)
         Text(truthfulStatus(record), style = MaterialTheme.typography.titleLarge)
-        Text("${formatMinutes(record.activeDurationMs)} active · ${record.config.intervalMinutes}-minute interval")
-        Text("Owner: ${if (record.owner == app.zhanzhuang.timer.model.SessionOwner.WEAR) "Watch" else "Phone"}")
-        Text("Started: ${record.startEpochMillis?.let(::localTime) ?: "Unknown"}")
-        Text("Ended: ${record.endEpochMillis?.let(::localTime) ?: "Not ended"}")
-        Text("Paused: ${formatMinutes(record.pausedDurationMs)}")
+        Text(stringResource(R.string.active_interval, formatMinutes(record.activeDurationMs), record.config.intervalMinutes))
+        Text(stringResource(R.string.owner, stringResource(if (record.owner == app.zhanzhuang.timer.model.SessionOwner.WEAR) R.string.watch else R.string.phone)))
+        Text(stringResource(R.string.started, record.startEpochMillis?.let(::localTime) ?: stringResource(R.string.unknown_time)))
+        Text(stringResource(R.string.ended, record.endEpochMillis?.let(::localTime) ?: stringResource(R.string.not_ended)))
+        Text(stringResource(R.string.paused_duration, formatMinutes(record.pausedDurationMs)))
         Text(heartRateSummary(record.heartRateSamples))
         HeartRateChart(record.heartRateSamples)
     }
@@ -42,7 +44,7 @@ private fun HeartRateChart(samples: List<HeartRateSample>) {
     val description = chartDescription(samples)
     val chartColor = MaterialTheme.colorScheme.primary
     if (samples.size < 2) {
-        Text("No heart-rate chart available", modifier = Modifier.semantics { contentDescription = description })
+        Text(stringResource(R.string.no_chart), modifier = Modifier.semantics { contentDescription = description })
         return
     }
     Canvas(
@@ -63,14 +65,14 @@ private fun HeartRateChart(samples: List<HeartRateSample>) {
     }
 }
 
-internal fun chartDescription(samples: List<HeartRateSample>): String = when {
-    samples.isEmpty() -> "Heart-rate chart: no samples"
-    else -> "Heart-rate chart: ${samples.size} samples, ${samples.minOf { it.bpm }.toInt()} to ${samples.maxOf { it.bpm }.toInt()} bpm"
+@Composable internal fun chartDescription(samples: List<HeartRateSample>): String = when {
+    samples.isEmpty() -> stringResource(R.string.chart_no_samples)
+    else -> stringResource(R.string.chart_samples, samples.size, samples.minOf { it.bpm }.toInt(), samples.maxOf { it.bpm }.toInt())
 }
 
-private fun heartRateSummary(samples: List<HeartRateSample>) = when {
-    samples.isEmpty() -> "Heart rate: not recorded"
-    else -> "Heart rate: ${samples.minOf { it.bpm }.toInt()}–${samples.maxOf { it.bpm }.toInt()} bpm, ${samples.size} samples"
+@Composable private fun heartRateSummary(samples: List<HeartRateSample>) = when {
+    samples.isEmpty() -> stringResource(R.string.heart_rate_not_recorded)
+    else -> stringResource(R.string.heart_rate_summary, samples.minOf { it.bpm }.toInt(), samples.maxOf { it.bpm }.toInt(), samples.size)
 }
 
 private fun localTime(milliseconds: Long): String = DateTimeFormatter.ofPattern("d MMM uuuu, HH:mm")

@@ -29,6 +29,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.mobile.ui.TrainingUiState
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionStatus
@@ -57,12 +59,12 @@ fun TrainingScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("站桩", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("Standing meditation", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.brand_chinese), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.standing_meditation), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton("History", onHistory)
-                TextButton("Settings", onSettings)
+                TextButton(stringResource(R.string.history), onHistory)
+                TextButton(stringResource(R.string.settings), onSettings)
             }
         }
         HorizontalDivider()
@@ -77,15 +79,15 @@ private fun TerminalTraining(state: TrainingUiState) {
     val status = state.session?.status ?: return
     Text(
         when (status) {
-            SessionStatus.COMPLETED -> "Completed"
-            SessionStatus.CANCELLED -> "Cancelled"
-            SessionStatus.INTERRUPTED -> "Interrupted"
+            SessionStatus.COMPLETED -> stringResource(R.string.terminal_completed)
+            SessionStatus.CANCELLED -> stringResource(R.string.terminal_cancelled)
+            SessionStatus.INTERRUPTED -> stringResource(R.string.terminal_interrupted)
             else -> status.name
         },
         style = MaterialTheme.typography.headlineMedium,
     )
-    Text("${state.activeElapsedMs / 60_000L} minutes active")
-    Text("Set up another session above from History or Settings when ready.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(stringResource(R.string.minutes_active, state.activeElapsedMs / 60_000L))
+    Text(stringResource(R.string.setup_another_session), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
@@ -95,23 +97,23 @@ private fun SetupTraining(
     onIntervalChange: (Int) -> Unit,
     onStart: () -> Unit,
 ) {
-    Text("Duration", style = MaterialTheme.typography.titleLarge)
+    Text(stringResource(R.string.duration), style = MaterialTheme.typography.titleLarge)
     Stepper(
-        value = "${state.config.durationMinutes} min",
-        description = "Duration ${state.config.durationMinutes} minutes",
+        value = stringResource(R.string.minutes_value, state.config.durationMinutes),
+        description = stringResource(R.string.duration_description, state.config.durationMinutes),
         onMinus = { onDurationChange((state.config.durationMinutes - 5).coerceAtLeast(15)) },
         onPlus = { onDurationChange((state.config.durationMinutes + 5).coerceAtMost(180)) },
     )
-    ChoiceFlow(durationShortcuts, state.config.durationMinutes, { "$it min" }, onDurationChange)
-    Text("Haptic interval", style = MaterialTheme.typography.titleLarge)
-    ChoiceFlow(intervals, state.config.intervalMinutes, { "Every $it min" }, onIntervalChange)
-    Text("Your watch vibrates at the interval. No sound is used.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ChoiceFlow(durationShortcuts, state.config.durationMinutes, { stringResource(R.string.minutes_value, it) }, onDurationChange)
+    Text(stringResource(R.string.haptic_interval), style = MaterialTheme.typography.titleLarge)
+    ChoiceFlow(intervals, state.config.intervalMinutes, { stringResource(R.string.every_minutes, it) }, onIntervalChange)
+    Text(stringResource(R.string.haptic_explanation), color = MaterialTheme.colorScheme.onSurfaceVariant)
     WatchStatus(state)
     Button(
         onClick = onStart,
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-    ) { Text("Start standing", fontWeight = FontWeight.Bold) }
+    ) { Text(stringResource(R.string.start_standing), fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -124,35 +126,36 @@ private fun ActiveTraining(
 ) {
     var confirmingEnd by rememberSaveable { mutableStateOf(false) }
     val paused = state.session?.status == SessionStatus.PAUSED
-    Text(if (paused) "Paused" else if (state.session?.owner == SessionOwner.WEAR) "Standing on watch" else "Standing", style = MaterialTheme.typography.titleLarge)
+    val remainingDescription = stringResource(R.string.seconds_remaining, state.remainingMs / 1_000L)
+    Text(if (paused) stringResource(R.string.paused) else if (state.session?.owner == SessionOwner.WEAR) stringResource(R.string.standing_on_watch) else stringResource(R.string.standing), style = MaterialTheme.typography.titleLarge)
     Text(
         formatDuration(state.remainingMs),
         style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace),
-        modifier = Modifier.semantics { stateDescription = "${state.remainingMs / 1_000L} seconds remaining" },
+        modifier = Modifier.semantics { stateDescription = remainingDescription },
     )
     if (state.session?.owner == SessionOwner.WEAR) {
-        Text("Your watch owns this timer; the phone will not run a second timer.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.watch_owns_timer), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     WatchStatus(state)
-    if (paused) Button(onClick = onResume, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Resume") }
-    else OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Pause") }
-    OutlinedButton(onClick = { confirmingEnd = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("End session") }
+    if (paused) Button(onClick = onResume, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.resume_session)) }
+    else OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.pause_session)) }
+    OutlinedButton(onClick = { confirmingEnd = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.end_session)) }
     if (confirmingEnd) AlertDialog(
         onDismissRequest = { confirmingEnd = false },
-        title = { Text("End this session?") },
-        text = { Text("End keeps the active time. Cancel marks the session as cancelled in local history.") },
-        confirmButton = { Button(onClick = { confirmingEnd = false; onFinish() }) { Text("End session") } },
-        dismissButton = { OutlinedButton(onClick = { confirmingEnd = false; onCancel() }) { Text("Cancel session") } },
+        title = { Text(stringResource(R.string.end_session_question)) },
+        text = { Text(stringResource(R.string.end_session_explanation)) },
+        confirmButton = { Button(onClick = { confirmingEnd = false; onFinish() }) { Text(stringResource(R.string.end_session)) } },
+        dismissButton = { OutlinedButton(onClick = { confirmingEnd = false; onCancel() }) { Text(stringResource(R.string.cancel_session)) } },
     )
 }
 
 @Composable
 private fun WatchStatus(state: TrainingUiState) {
     if (state.watchConnected) {
-        Text("Watch connected${state.watchName?.let { ": $it" } ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(state.watchName?.let { stringResource(R.string.watch_connected, it) } ?: stringResource(R.string.watch_connected_generic), color = MaterialTheme.colorScheme.onSurfaceVariant)
     } else {
-        Text("Watch disconnected", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("This session won't record heart rate", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.watch_disconnected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.watch_no_heart_rate), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -166,7 +169,7 @@ private fun Stepper(value: String, description: String, onMinus: () -> Unit, onP
 }
 
 @Composable
-private fun <T> ChoiceFlow(values: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+private fun <T> ChoiceFlow(values: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         values.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

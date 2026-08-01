@@ -17,11 +17,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.wear.R
 import app.zhanzhuang.timer.wear.ui.WearSetupState
 
 @Composable
@@ -48,29 +50,29 @@ fun SetupScreen(
         contentAlignment = Alignment.Center,
     ) {
         ScreenColumn(scrollState = scroll) {
-            Text("站桩", color = colors.primaryContainer)
-            Text("Standing meditation", color = colors.onBackground)
-            Text("Duration", color = colors.primaryContainer)
+            Text(stringResource(R.string.brand_chinese), color = colors.primaryContainer)
+            Text(stringResource(R.string.standing_meditation), color = colors.onBackground)
+            Text(stringResource(R.string.duration), color = colors.primaryContainer)
             StepperRow(
-                value = "${config.durationMinutes} min",
-                description = "Duration ${config.durationMinutes} minutes",
+                value = stringResource(R.string.minutes_value, config.durationMinutes),
+                description = stringResource(R.string.duration_description, config.durationMinutes),
                 onDecrease = { onConfigChange(WearSetupState(config).withDurationDelta(-1).config) },
                 onIncrease = { onConfigChange(WearSetupState(config).withDurationDelta(1).config) },
             )
-            Text("Interval", color = colors.primaryContainer)
+            Text(stringResource(R.string.interval), color = colors.primaryContainer)
             StepperRow(
-                value = "Every ${config.intervalMinutes} min",
-                description = "Interval every ${config.intervalMinutes} minutes",
+                value = stringResource(R.string.every_minutes, config.intervalMinutes),
+                description = stringResource(R.string.interval_description, config.intervalMinutes),
                 onDecrease = { onConfigChange(WearSetupState(config).withIntervalDelta(-1).config) },
                 onIncrease = { onConfigChange(WearSetupState(config).withIntervalDelta(1).config) },
             )
-            Text("Shortcuts", color = colors.primaryContainer)
+            Text(stringResource(R.string.shortcuts), color = colors.primaryContainer)
             listOf(15, 30, 45, 60, 90, 120, 180).forEach { minutes ->
-                SoilAction("$minutes min", "Set duration to $minutes minutes", onClick = {
+                SoilAction(stringResource(R.string.minutes_value, minutes), stringResource(R.string.set_duration, minutes), onClick = {
                     onConfigChange(WearSetupState(config).withDuration(minutes).config)
                 })
             }
-            GoldAction("Start", onClick = onStart)
+            GoldAction(stringResource(R.string.start_session), onClick = onStart)
         }
     }
 }
@@ -78,8 +80,8 @@ fun SetupScreen(
 @Composable
 private fun StepperRow(value: String, description: String, onDecrease: () -> Unit, onIncrease: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        SoilAction("−", "Decrease $description", onDecrease, Modifier.weight(1f))
+        SoilAction("−", stringResource(R.string.decrease, description), onDecrease, Modifier.weight(1f))
         Text(value, modifier = Modifier.weight(2f).semantics { stateDescription = description }, color = MaterialTheme.colorScheme.onSurface)
-        SoilAction("+", "Increase $description", onIncrease, Modifier.weight(1f))
+        SoilAction("+", stringResource(R.string.increase, description), onIncrease, Modifier.weight(1f))
     }
 }

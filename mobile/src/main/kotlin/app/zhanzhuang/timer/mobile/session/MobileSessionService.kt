@@ -14,6 +14,7 @@ import androidx.room.Room
 import app.zhanzhuang.timer.mobile.data.MobileDatabase
 import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
 import app.zhanzhuang.timer.mobile.health.HealthSyncWorker
+import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.model.SessionConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
@@ -171,14 +172,14 @@ open class MobileSessionService : Service() {
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Standing meditation timer", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, getString(R.string.notification_channel_mobile), NotificationManager.IMPORTANCE_LOW),
         )
     }
 
     private fun notification(): Notification = Notification.Builder(this, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-        .setContentTitle("Standing meditation timer")
-        .setContentText("A session is active on this phone")
+        .setContentTitle(getString(R.string.notification_channel_mobile))
+        .setContentText(getString(R.string.notification_active_phone))
         .setOngoing(true)
         .build()
 

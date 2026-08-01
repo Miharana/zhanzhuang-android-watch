@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.mobile.health.HealthAvailability
 import app.zhanzhuang.timer.mobile.health.HealthPermissionState
 import app.zhanzhuang.timer.mobile.ui.HealthUiState
@@ -35,34 +37,34 @@ fun SettingsScreen(
 ) {
     var legalNotice by rememberSaveable { mutableStateOf<String?>(null) }
     Column(modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back") }
-        Text("Settings", style = MaterialTheme.typography.headlineMedium)
-        Text("Defaults", style = MaterialTheme.typography.titleLarge)
-        Text("Duration: ${config.durationMinutes} min")
-        OutlinedButton(onClick = { onDurationChange((config.durationMinutes + 5).takeIf { it <= 180 } ?: 15) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Change duration default") }
-        Text("Interval: every ${config.intervalMinutes} min")
-        OutlinedButton(onClick = { onIntervalChange(listOf(5, 10, 15, 20, 30).let { values -> values[(values.indexOf(config.intervalMinutes) + 1) % values.size] }) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Change interval default") }
-        Text("Health Connect", style = MaterialTheme.typography.titleLarge)
+        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.back)) }
+        Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.defaults), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.duration_default, config.durationMinutes))
+        OutlinedButton(onClick = { onDurationChange((config.durationMinutes + 5).takeIf { it <= 180 } ?: 15) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.change_duration_default)) }
+        Text(stringResource(R.string.interval_default, config.intervalMinutes))
+        OutlinedButton(onClick = { onIntervalChange(listOf(5, 10, 15, 20, 30).let { values -> values[(values.indexOf(config.intervalMinutes) + 1) % values.size] }) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.change_interval_default)) }
+        Text(stringResource(R.string.health_connect), style = MaterialTheme.typography.titleLarge)
         Text(healthLabel(health))
-        if (health.permission is HealthPermissionState.Missing && health.availability != HealthAvailability.UNAVAILABLE) Button(onClick = onRequestHealthPermission, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Allow Health Connect writing") }
-        OutlinedButton(onClick = onRetryHealth, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Retry completed session sync") }
-        Text("Privacy", style = MaterialTheme.typography.titleLarge)
-        Text("Sessions stay on this device. There are no accounts, ads, analytics, or cloud backup.")
-        OutlinedButton(onClick = { legalNotice = "Privacy policy\n\nThis app stores practice records locally. Optional Health Connect writes happen only after you allow them. No account, ads, analytics, or cloud service is used." }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Privacy policy") }
-        OutlinedButton(onClick = { legalNotice = "Open-source licenses\n\nLicense notices will be included with the release package." }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Open-source licenses") }
+        if (health.permission is HealthPermissionState.Missing && health.availability != HealthAvailability.UNAVAILABLE) Button(onClick = onRequestHealthPermission, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.allow_health_writing)) }
+        OutlinedButton(onClick = onRetryHealth, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.retry_health_sync)) }
+        Text(stringResource(R.string.privacy), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.privacy_summary))
+        OutlinedButton(onClick = { legalNotice = "privacy" }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.privacy_policy)) }
+        OutlinedButton(onClick = { legalNotice = "licenses" }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.open_source_licenses)) }
     }
     legalNotice?.let { notice ->
         AlertDialog(
             onDismissRequest = { legalNotice = null },
-            title = { Text(notice.substringBefore("\n")) },
-            text = { Text(notice.substringAfter("\n\n")) },
-            confirmButton = { Button(onClick = { legalNotice = null }) { Text("Close") } },
+            title = { Text(stringResource(if (notice == "privacy") R.string.privacy_policy else R.string.open_source_licenses)) },
+            text = { Text(stringResource(if (notice == "privacy") R.string.privacy_policy_body else R.string.licenses_body)) },
+            confirmButton = { Button(onClick = { legalNotice = null }) { Text(stringResource(R.string.close)) } },
         )
     }
 }
 
-private fun healthLabel(health: HealthUiState) = when (health.availability) {
-    HealthAvailability.AVAILABLE -> when (health.permission) { HealthPermissionState.Granted -> "Available and allowed"; is HealthPermissionState.Missing -> "Available. Permission is optional." }
-    HealthAvailability.MINDFULNESS_UNSUPPORTED -> "Available with exercise-session fallback"
-    HealthAvailability.UNAVAILABLE, null -> "Unavailable on this phone"
+@Composable private fun healthLabel(health: HealthUiState) = when (health.availability) {
+    HealthAvailability.AVAILABLE -> when (health.permission) { HealthPermissionState.Granted -> stringResource(R.string.health_available_allowed); is HealthPermissionState.Missing -> stringResource(R.string.health_available_optional) }
+    HealthAvailability.MINDFULNESS_UNSUPPORTED -> stringResource(R.string.health_fallback)
+    HealthAvailability.UNAVAILABLE, null -> stringResource(R.string.health_unavailable)
 }

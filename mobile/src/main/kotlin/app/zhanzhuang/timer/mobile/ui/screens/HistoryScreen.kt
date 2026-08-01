@@ -18,6 +18,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.mobile.ui.HistoryStats
 import app.zhanzhuang.timer.model.SessionRecord
 import java.time.Instant
@@ -27,19 +29,21 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun HistoryScreen(records: List<SessionRecord>, stats: HistoryStats, onOpen: (SessionRecord) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back") }
-        Text("History", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.back)) }
+        Text(stringResource(R.string.history), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Stat("Today", stats.todayActiveMs)
-            Stat("7 days", stats.weekActiveMs)
-            Stat("30 days", stats.monthActiveMs)
+            Stat(stringResource(R.string.today), stats.todayActiveMs)
+            Stat(stringResource(R.string.seven_days), stats.weekActiveMs)
+            Stat(stringResource(R.string.thirty_days), stats.monthActiveMs)
         }
-        if (records.isEmpty()) Text("No sessions yet. Your completed standing practice will appear here.")
+        if (records.isEmpty()) Text(stringResource(R.string.no_sessions))
         else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(records.sortedByDescending { it.startEpochMillis ?: Long.MIN_VALUE }, key = SessionRecord::id) { record ->
-                Card(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { onOpen(record) }.semantics { contentDescription = "Open ${record.status.name.lowercase()} session" }) {
+                val status = truthfulStatus(record)
+                val openDescription = stringResource(R.string.open_session, status)
+                Card(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { onOpen(record) }.semantics { contentDescription = openDescription }) {
                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column { Text(date(record)); Text(truthfulStatus(record)) }
+                        Column { Text(date(record)); Text(status) }
                         Text(formatMinutes(record.activeDurationMs), fontWeight = FontWeight.Bold)
                     }
                 }
@@ -49,6 +53,6 @@ fun HistoryScreen(records: List<SessionRecord>, stats: HistoryStats, onOpen: (Se
 }
 
 @Composable private fun Stat(label: String, value: Long) { Column { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(formatMinutes(value), fontWeight = FontWeight.Bold) } }
-private fun date(record: SessionRecord) = record.startEpochMillis?.let { DateTimeFormatter.ofPattern("d MMM, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(it)) } ?: "Unknown time"
-internal fun truthfulStatus(record: SessionRecord) = when (record.status) { app.zhanzhuang.timer.model.SessionStatus.COMPLETED -> "Completed"; app.zhanzhuang.timer.model.SessionStatus.CANCELLED -> "Cancelled"; app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED -> "Interrupted"; else -> record.status.name.lowercase().replaceFirstChar(Char::uppercase) }
-internal fun formatMinutes(milliseconds: Long) = "${milliseconds / 60_000L} min"
+@Composable private fun date(record: SessionRecord) = record.startEpochMillis?.let { DateTimeFormatter.ofPattern("d MMM, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(it)) } ?: stringResource(R.string.unknown_time)
+@Composable internal fun truthfulStatus(record: SessionRecord) = when (record.status) { app.zhanzhuang.timer.model.SessionStatus.COMPLETED -> stringResource(R.string.terminal_completed); app.zhanzhuang.timer.model.SessionStatus.CANCELLED -> stringResource(R.string.terminal_cancelled); app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED -> stringResource(R.string.terminal_interrupted); else -> record.status.name.lowercase().replaceFirstChar(Char::uppercase) }
+@Composable internal fun formatMinutes(milliseconds: Long) = stringResource(R.string.minutes_value, milliseconds / 60_000L)
