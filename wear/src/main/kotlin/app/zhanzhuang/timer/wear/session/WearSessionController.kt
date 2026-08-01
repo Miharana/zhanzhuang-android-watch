@@ -80,6 +80,7 @@ class WearSessionControllerImpl(
     private var heartRateUnavailableReason: String? = null
     private var lastStoredSampleAtBootMs = 0L
     private var samplesSinceStore = 0
+    private var heartRateAcceptFromBootMs: Long? = null
 
     override suspend fun start(config: SessionConfig, sessionId: String) = mutex.withLock {
         check(record?.status !in ACTIVE_STATUSES) { "A Wear session is already active" }
@@ -92,6 +93,7 @@ class WearSessionControllerImpl(
             startEpochMillis = clock.epochMillis(),
         )
         runningSinceBootMs = null
+        heartRateAcceptFromBootMs = null
         nextReminderAtActiveMs = config.intervalMinutes * MINUTE_MS
         healthExerciseOwned = false
         pendingOperation = WearExternalOperation.START
@@ -114,6 +116,7 @@ class WearSessionControllerImpl(
         pendingOperation = null
         record = record!!.copy(status = SessionStatus.RUNNING)
         runningSinceBootMs = clock.elapsedRealtimeMs()
+        heartRateAcceptFromBootMs = runningSinceBootMs
         persistSnapshotAndRecord()
         haptics.play(Cue.START)
     }
@@ -143,6 +146,7 @@ class WearSessionControllerImpl(
             pausedDurationMs = paused.pausedDurationMs + (clock.elapsedRealtimeMs() - (pausedSinceBootMs ?: clock.elapsedRealtimeMs())).coerceAtLeast(0),
         )
         runningSinceBootMs = clock.elapsedRealtimeMs()
+        heartRateAcceptFromBootMs = runningSinceBootMs
         pausedSinceBootMs = null
         pendingOperation = null
         persistSnapshotAndRecord()
@@ -183,7 +187,7 @@ class WearSessionControllerImpl(
                 val active = record?.takeIf { it.status == SessionStatus.RUNNING && healthExerciseOwned } ?: return
                 if (update.bpm !in MIN_HEART_RATE..MAX_HEART_RATE) return
                 val nowElapsed = clock.elapsedRealtimeMs()
-                val lowerBound = runningSinceBootMs ?: nowElapsed
+                val lowerBound = heartRateAcceptFromBootMs ?: nowElapsed
                 if (update.timeSinceBootMs !in lowerBound..nowElapsed) return
                 val epoch = try {
                     Math.addExact(Math.subtractExact(clock.epochMillis(), nowElapsed), update.timeSinceBootMs)
@@ -209,13 +213,16 @@ class WearSessionControllerImpl(
 
     override suspend fun recover(currentBootId: String): WearSessionRecovery = mutex.withLock {
         val snapshot = snapshots.load() ?: return@withLock WearSessionRecovery.NO_SESSION
-        record = snapshot.record
+        // Snapshot omits growing HR history; merge Room's durable aggregate before any upsert.
+        val durable = records.get(snapshot.record.id)
+        record = snapshot.record.copy(heartRateSamples = durable?.heartRateSamples ?: snapshot.record.heartRateSamples)
         runningSinceBootMs = snapshot.runningSinceBootMs
         nextReminderAtActiveMs = snapshot.nextReminderAtActiveMs
         healthExerciseOwned = snapshot.healthExerciseOwned
         pendingOperation = snapshot.pendingOperation
         pausedSinceBootMs = snapshot.pausedSinceBootMs
         intendedTerminalStatus = snapshot.intendedTerminalStatus
+        heartRateAcceptFromBootMs = snapshot.heartRateAcceptFromBootMs
         if (record!!.status in TERMINAL_STATUSES) {
             repairTerminalDurability(snapshotBootId = currentBootId)
             publishState()
@@ -232,6 +239,7 @@ class WearSessionControllerImpl(
             applyStartResult(health.start())
             record = record!!.copy(status = SessionStatus.RUNNING)
             runningSinceBootMs = clock.elapsedRealtimeMs()
+            heartRateAcceptFromBootMs = runningSinceBootMs
             pendingOperation = null
             persistSnapshotAndRecord(currentBootId)
             return@withLock WearSessionRecovery.ACTIVE
@@ -276,6 +284,7 @@ class WearSessionControllerImpl(
                     pausedDurationMs = paused.pausedDurationMs + (clock.elapsedRealtimeMs() - (pausedSinceBootMs ?: clock.elapsedRealtimeMs())).coerceAtLeast(0),
                 )
                 runningSinceBootMs = clock.elapsedRealtimeMs()
+                heartRateAcceptFromBootMs = runningSinceBootMs
                 pausedSinceBootMs = null
                 pendingOperation = null
                 persistSnapshotAndRecord(currentBootId)
@@ -329,6 +338,7 @@ class WearSessionControllerImpl(
                 pendingOperation = pendingOperation,
                 pausedSinceBootMs = pausedSinceBootMs,
                 intendedTerminalStatus = intendedTerminalStatus,
+                heartRateAcceptFromBootMs = heartRateAcceptFromBootMs,
             ),
         )
     }

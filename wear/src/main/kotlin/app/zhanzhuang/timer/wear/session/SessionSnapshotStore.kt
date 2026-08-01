@@ -20,6 +20,7 @@ data class WearSessionSnapshot(
     val pendingOperation: WearExternalOperation? = null,
     val pausedSinceBootMs: Long? = null,
     val intendedTerminalStatus: SessionStatus? = null,
+    val heartRateAcceptFromBootMs: Long? = null,
 )
 
 enum class WearExternalOperation { START, PAUSE, RESUME, END }
@@ -48,6 +49,7 @@ class SharedPreferencesSessionSnapshotStore(
         put("pendingOperation", pendingOperation?.name)
         put("pausedSinceBootMs", pausedSinceBootMs)
         put("intendedTerminalStatus", intendedTerminalStatus?.name)
+        put("heartRateAcceptFromBootMs", heartRateAcceptFromBootMs)
         put("id", record.id)
         put("revision", record.revision)
         put("durationMinutes", record.config.durationMinutes)
@@ -91,6 +93,7 @@ class SharedPreferencesSessionSnapshotStore(
             pendingOperation = optString("pendingOperation").takeIf { it.isNotEmpty() }?.let(WearExternalOperation::valueOf),
             pausedSinceBootMs = getLongOrNull("pausedSinceBootMs"),
             intendedTerminalStatus = optString("intendedTerminalStatus").takeIf { it.isNotEmpty() }?.let(SessionStatus::valueOf),
+            heartRateAcceptFromBootMs = getLongOrNull("heartRateAcceptFromBootMs"),
         )
     }
 

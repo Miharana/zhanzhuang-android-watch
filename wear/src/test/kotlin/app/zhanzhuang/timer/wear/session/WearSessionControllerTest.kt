@@ -246,6 +246,20 @@ class WearSessionControllerTest {
     }
 
     @Test
+    fun recoveryMergesDurableHeartRateHistoryWhenSnapshotOmitsIt() = runTest {
+        val store = RecordingStore().also { it.seed(record(SessionStatus.RUNNING, samples())) }
+        val controller = WearSessionControllerImpl(
+            store,
+            RecordingSnapshots().also { it.save(WearSessionSnapshot(record(SessionStatus.RUNNING), "boot", runningSinceBootMs = 0, heartRateAcceptFromBootMs = 0)) },
+            RecordingHealth(), AdjustableClock(), RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+
+        assertEquals(samples(), controller.state.value.record!!.heartRateSamples)
+    }
+
+    @Test
     fun heartRateUsesEventMonotonicTimestampAndOnlyRunningOwnedSession() = runTest {
         val clock = AdjustableClock().also { it.advanceBy(500) }
         val controller = WearSessionControllerImpl(
@@ -346,6 +360,7 @@ class WearSessionControllerTest {
             events += "outbox:${record.id}"
         }
         fun latest(): SessionRecord? = record
+        fun seed(record: SessionRecord) { this.record = record }
     }
 
     private class RecordingSnapshots : SessionSnapshotStore {
