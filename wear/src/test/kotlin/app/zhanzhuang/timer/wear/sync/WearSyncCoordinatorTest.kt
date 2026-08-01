@@ -54,10 +54,11 @@ class WearSyncCoordinatorTest {
 
     @Test
     fun timedOutStartCanRetryWithTheSameEventAfterTheActorPersistsState() = runTest {
+        var now = 1_000L
         val persisted = record(2).copy(status = SessionStatus.RUNNING)
         val controller = RetryableController()
         val transport = FakeTransport()
-        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { 1_000 })
+        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { now })
         val start = envelope(
             eventId = "retry-start",
             revision = 1,
@@ -66,10 +67,31 @@ class WearSyncCoordinatorTest {
 
         assertFalse(coordinator.receiveCommand(start))
         controller.persistAfterTimeout(persisted)
+        now = 3_000
         assertTrue(coordinator.receiveCommand(start))
 
-        assertEquals(2, controller.startCalls)
+        assertEquals(1, controller.startCalls)
         assertEquals(1, transport.messages.count { it.payload is SyncPayload.State })
+    }
+
+    @Test
+    fun expiredStartWithoutDurableStateIsRejected() = runTest {
+        val controller = RetryableController()
+        val coordinator = WearSyncCoordinator(FakeOutbox(), FakeTransport(), controller, nowEpochMillis = { 3_000 })
+
+        assertFalse(coordinator.receiveCommand(envelope("expired", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000))))
+        assertEquals(0, controller.startCalls)
+    }
+
+    @Test
+    fun expiredStartReplaysDurableTerminalState() = runTest {
+        val controller = RetryableController().also { it.persistAfterTimeout(record(2)) }
+        val transport = FakeTransport()
+        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { 3_000 })
+
+        assertTrue(coordinator.receiveCommand(envelope("terminal", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000))))
+        assertEquals(0, controller.startCalls)
+        assertEquals(SessionStatus.COMPLETED, (transport.messages.single().payload as SyncPayload.State).record.status)
     }
 
     @Test
@@ -152,7 +174,7 @@ class WearSyncCoordinatorTest {
         }
         fun persistAfterTimeout(record: SessionRecord) { durableRecord = record }
         override suspend fun current(): SessionRecord? = null
-        override suspend fun session(sessionId: String): SessionRecord? = null
+        override suspend fun session(sessionId: String): SessionRecord? = durableRecord?.takeIf { it.id == sessionId }
         override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = null
         override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
         override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = null

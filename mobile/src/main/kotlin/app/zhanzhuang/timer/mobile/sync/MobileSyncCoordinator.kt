@@ -66,12 +66,16 @@ class MobileSyncCoordinator(
         if (!isValidUnseenEnvelope(envelope)) return false
         val handled = when (val payload = envelope.payload) {
             is SyncPayload.Start -> {
-                if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
                 val current = controller.session(envelope.sessionId)
                 when {
-                    current?.status in TERMINAL_STATUSES -> false
+                    // A same-ID terminal record is proof this start has already
+                    // been decided; acknowledge it without allowing a revival.
+                    current?.status in TERMINAL_STATUSES -> current?.let {
+                        respond(envelope(it, SyncPayload.State(it)), sourceNodeId)
+                    } ?: false
                     current?.owner == SessionOwner.WEAR && current.status in ACTIVE_STATUSES ->
                         respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    payload.expiresAtEpochMillis <= nowEpochMillis() -> false
                     isLowerRevision(envelope) -> false
                     else -> {
                         val started = controller.startFromRemote(payload.config, envelope.sessionId, envelope.revision)

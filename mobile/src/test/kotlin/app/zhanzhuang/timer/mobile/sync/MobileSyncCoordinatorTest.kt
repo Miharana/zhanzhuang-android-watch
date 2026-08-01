@@ -55,11 +55,42 @@ class MobileSyncCoordinatorTest {
             eventId = "old",
             revision = 1,
             payload = SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 9_999),
-        )
+        ).copy(sessionId = "unseen")
 
         assertFalse(coordinator.receiveCommand(expired))
         assertFalse(coordinator.receiveCommand(expired))
         assertEquals(0, controller.remoteStarts)
+    }
+
+    @Test
+    fun expiredStartReplaysLateDurableRemoteStateWithoutStartingAgain() = runTest {
+        var now = 1_000L
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false, true)))
+        val controller = FakeController().also { it.seed(record(SessionOwner.MOBILE).copy(status = SessionStatus.STARTING)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { now })
+        val start = envelope("late-start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000))
+
+        assertFalse(coordinator.receiveCommand(start))
+        now = 11_000
+        assertTrue(coordinator.receiveCommand(start))
+
+        assertEquals(1, controller.remoteStarts)
+        val state = transport.envelopes.last().payload as SyncPayload.State
+        assertEquals(SessionStatus.RUNNING, state.record.status)
+    }
+
+    @Test
+    fun expiredStartForAnExistingTerminalSessionReplaysTerminalState() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also {
+            it.seed(record(SessionOwner.WEAR).copy(status = SessionStatus.COMPLETED, revision = 2))
+        }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 11_000L })
+
+        assertTrue(coordinator.receiveCommand(envelope("terminal-start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000))))
+
+        assertEquals(0, controller.remoteStarts)
+        assertEquals(SessionStatus.COMPLETED, (transport.envelopes.single().payload as SyncPayload.State).record.status)
     }
 
     @Test

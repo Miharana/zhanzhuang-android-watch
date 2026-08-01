@@ -3,6 +3,7 @@ package app.zhanzhuang.timer.wear.sync
 import app.zhanzhuang.timer.domain.SyncConflictResolver
 import app.zhanzhuang.timer.model.PROTOCOL_VERSION
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.model.SyncEnvelope
@@ -52,10 +53,14 @@ class WearSyncCoordinator(
         val handled = when (val payload = envelope.payload) {
             is SyncPayload.Ack -> acknowledge(envelope.eventId, envelope.sessionId, envelope.revision, payload.acceptedRevision)
             is SyncPayload.Start -> {
-                if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
                 // A matching durable ID is an idempotent replay, even when the
                 // actor has already advanced its revision after the first try.
-                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it, sourceNodeId) } == true
+                val current = controller?.session(envelope.sessionId)
+                when {
+                    current?.owner == SessionOwner.WEAR && current.status in START_REPLAY_STATUSES -> sendState(current, sourceNodeId)
+                    payload.expiresAtEpochMillis <= nowEpochMillis() -> false
+                    else -> controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it, sourceNodeId) } == true
+                }
             }
             SyncPayload.QueryState -> controller?.current()?.let { sendState(it, sourceNodeId) } == true
             SyncPayload.Pause -> if (rejectsLowerRevision(envelope, setOf(SessionStatus.PAUSED))) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } == true
@@ -131,6 +136,7 @@ class WearSyncCoordinator(
 
     private companion object {
         const val MAX_SEEN_EVENTS = 512
+        val START_REPLAY_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING, SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
         val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }

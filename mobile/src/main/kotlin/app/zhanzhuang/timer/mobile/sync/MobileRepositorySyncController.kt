@@ -114,7 +114,11 @@ class MobileRepositorySyncController(
                     SessionStatus.RUNNING -> MobileSessionService.ACTION_RESUME
                     else -> MobileSessionService.ACTION_FINISH
                 }
-                context.startService(android.content.Intent(context, MobileSessionService::class.java).setAction(action))
+                context.startService(
+                    android.content.Intent(context, MobileSessionService::class.java)
+                        .setAction(action)
+                        .putExtra(MobileSessionService.EXTRA_CANCELLED, status == SessionStatus.CANCELLED),
+                )
             }
         }
     }

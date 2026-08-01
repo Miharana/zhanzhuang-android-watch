@@ -48,6 +48,22 @@ class MobileSessionServiceTest {
     }
 
     @Test
+    fun explicitCancelledFinishReachesTheRuntimeAsCancellation() = runTest {
+        val controller = RecordingController(finishIsTerminal = true)
+        val service = serviceWith(controller)
+
+        service.onStartCommand(
+            intent(MobileSessionService.ACTION_FINISH)
+                .putExtra(MobileSessionService.EXTRA_CANCELLED, true),
+            0,
+            1,
+        )
+        service.lastActionJob!!.join()
+
+        assertEquals(listOf(true), controller.finishCancelled)
+    }
+
+    @Test
     fun recreatedServiceDoesNotStartOverRecoveredActiveSession() = runTest {
         val controller = RecordingController()
         val service = serviceWith(controller)
@@ -118,6 +134,7 @@ class MobileSessionServiceTest {
         )
         override val state: StateFlow<MobileSessionUiState> = mutableState
         val calls = mutableListOf<String>()
+        val finishCancelled = mutableListOf<Boolean>()
 
         override suspend fun recover(): Boolean {
             calls += "recover"
@@ -138,6 +155,7 @@ class MobileSessionServiceTest {
 
         override suspend fun finish(cancelled: Boolean) {
             calls += "finish"
+            finishCancelled += cancelled
             if (finishIsTerminal) {
                 mutableState.value = MobileSessionUiState(
                     session = SessionRecord(status = SessionStatus.COMPLETED),
