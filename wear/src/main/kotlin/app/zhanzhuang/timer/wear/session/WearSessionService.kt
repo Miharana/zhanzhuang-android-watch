@@ -6,10 +6,13 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.os.SystemClock
 import android.os.Vibrator
 import androidx.health.services.client.HealthServices
 import androidx.room.Room
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionOwner
+import app.zhanzhuang.timer.model.SessionRuntime
 import app.zhanzhuang.timer.wear.data.WearDatabase
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.health.AndroidWearHealthClient
@@ -34,6 +37,8 @@ class WearSessionService : Service() {
     private lateinit var controller: WearSessionControllerImpl
     private lateinit var notification: OngoingSessionNotification
     private var ticker: Job? = null
+    private var runtimePublishJob: Job? = null
+    private var lastRuntimePublishElapsedMs = Long.MIN_VALUE
     private lateinit var commands: WearSessionCommandProcessor
     private val requests = Channel<ServiceRequest>(Channel.UNLIMITED)
     private val generation = AtomicLong(0)
@@ -85,6 +90,7 @@ class WearSessionService : Service() {
 
     override fun onDestroy() {
         ticker?.cancel()
+        runtimePublishJob?.cancel()
         requests.close()
         serviceScope.cancel()
         super.onDestroy()
@@ -117,6 +123,7 @@ class WearSessionService : Service() {
                 ServiceCommandResult.ACTIVE -> {
                     publishForeground(request.generation)
                     startTicker(request.startId, request.generation)
+                    scheduleRuntimePublish(force = true)
                     app.zhanzhuang.timer.wear.sync.WearServiceCommandGateway.complete(
                         request.requestId,
                         controller.state.value.record?.takeIf { request.expectedSessionId == null || it.id == request.expectedSessionId },
@@ -143,7 +150,11 @@ class WearSessionService : Service() {
             is ServiceRequest.Tick -> if (request.generation == generation.get()) {
                 controller.tick()
                 publishForeground(request.generation)
-                if (controller.state.value.record?.status in TERMINAL_STATUSES) stopIfCurrent(request.startId, request.generation)
+                scheduleRuntimePublish(force = false)
+                if (controller.state.value.record?.status in TERMINAL_STATUSES) {
+                    publishTerminalState()
+                    stopIfCurrent(request.startId, request.generation)
+                }
             }
         }
     }
@@ -151,6 +162,50 @@ class WearSessionService : Service() {
     private fun publishForeground(requestGeneration: Long) {
         if (requestGeneration != generation.get() || controller.state.value.record?.status !in ACTIVE_STATUSES) return
         startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
+    }
+
+    /**
+     * The Wear foreground service, not the phone UI, samples this runtime
+     * presentation. Five-second state messages keep the companion countdown
+     * truthful without a per-second radio wakeup.
+     */
+    private fun scheduleRuntimePublish(force: Boolean) {
+        val state = controller.state.value
+        val record = state.record?.takeIf {
+            it.owner == SessionOwner.WEAR && it.status in ACTIVE_STATUSES
+        } ?: return
+        val elapsed = SystemClock.elapsedRealtime()
+        if (!force && elapsed - lastRuntimePublishElapsedMs < RUNTIME_PUBLISH_INTERVAL_MS) return
+        lastRuntimePublishElapsedMs = elapsed
+        val runtime = SessionRuntime(
+            sessionId = record.id,
+            revision = record.revision,
+            status = record.status,
+            activeDurationMs = (record.config.durationMinutes * 60_000L - state.remainingMs).coerceAtLeast(0),
+            remainingMs = state.remainingMs,
+            reportedAtEpochMillis = System.currentTimeMillis(),
+        )
+        if (force) runtimePublishJob?.cancel()
+        runtimePublishJob = serviceScope.launch {
+            try {
+                app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext).publishRuntime(runtime)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // The next low-frequency service checkpoint retries when a peer is reachable.
+            }
+        }
+    }
+
+    private suspend fun publishTerminalState() {
+        val terminal = controller.state.value.record?.takeIf { it.status in TERMINAL_STATUSES } ?: return
+        try {
+            app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext).publishState(terminal)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // WearCompletionSyncWorker retains the completed DataItem retry path.
+        }
     }
 
     private sealed interface ServiceRequest {
@@ -186,6 +241,7 @@ class WearSessionService : Service() {
         const val EXTRA_DURATION_MINUTES = "duration_minutes"
         const val EXTRA_INTERVAL_MINUTES = "interval_minutes"
         private const val TICK_MS = 1_000L
+        private const val RUNTIME_PUBLISH_INTERVAL_MS = 5_000L
         private val TERMINAL_STATUSES = setOf(
             app.zhanzhuang.timer.model.SessionStatus.COMPLETED,
             app.zhanzhuang.timer.model.SessionStatus.CANCELLED,

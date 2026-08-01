@@ -34,8 +34,27 @@ sealed interface SyncPayload {
     @Serializable data class Finish(val cancelled: Boolean) : SyncPayload
     @Serializable data class CancelIfUnowned(val ownerRevision: Long) : SyncPayload
     @Serializable data class State(val record: SessionRecord) : SyncPayload
+    /** Ephemeral, service-authoritative Wear timer presentation; it never replaces Room history. */
+    @Serializable data class Runtime(val runtime: SessionRuntime) : SyncPayload
     @Serializable data class Completed(val record: SessionRecord) : SyncPayload
     @Serializable data class Ack(val acceptedRevision: Long) : SyncPayload
+}
+
+@Serializable
+data class SessionRuntime(
+    val sessionId: String,
+    val revision: Long,
+    val status: SessionStatus,
+    val activeDurationMs: Long,
+    val remainingMs: Long,
+    val reportedAtEpochMillis: Long,
+) {
+    init {
+        require(revision >= 0)
+        require(activeDurationMs >= 0)
+        require(remainingMs >= 0)
+        require(status in setOf(SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING))
+    }
 }
 
 /** The small wire surface shared by the Android Data Layer adapters and coordinator tests. */

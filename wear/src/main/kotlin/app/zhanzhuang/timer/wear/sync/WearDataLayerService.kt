@@ -92,7 +92,9 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
     override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
         val path = when (envelope.payload) {
             is SyncPayload.Ack -> PATH_ACK
-            is SyncPayload.State -> PATH_STATE
+            is SyncPayload.State,
+            is SyncPayload.Runtime,
+            -> PATH_STATE
             else -> PATH_COMMAND
         }
         val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
@@ -107,7 +109,9 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
     override suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean {
         val path = when (envelope.payload) {
             is SyncPayload.Ack -> PATH_ACK
-            is SyncPayload.State -> PATH_STATE
+            is SyncPayload.State,
+            is SyncPayload.Runtime,
+            -> PATH_STATE
             else -> PATH_COMMAND
         }
         return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) {

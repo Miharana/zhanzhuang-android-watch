@@ -94,7 +94,9 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
     override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
         val path = when (envelope.payload) {
             is app.zhanzhuang.timer.model.SyncPayload.Ack -> PATH_ACK
-            is app.zhanzhuang.timer.model.SyncPayload.State -> PATH_STATE
+            is app.zhanzhuang.timer.model.SyncPayload.State,
+            is app.zhanzhuang.timer.model.SyncPayload.Runtime,
+            -> PATH_STATE
             else -> PATH_COMMAND
         }
         val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
@@ -109,7 +111,9 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
     override suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean {
         val path = when (envelope.payload) {
             is app.zhanzhuang.timer.model.SyncPayload.Ack -> PATH_ACK
-            is app.zhanzhuang.timer.model.SyncPayload.State -> PATH_STATE
+            is app.zhanzhuang.timer.model.SyncPayload.State,
+            is app.zhanzhuang.timer.model.SyncPayload.Runtime,
+            -> PATH_STATE
             else -> PATH_COMMAND
         }
         return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) {

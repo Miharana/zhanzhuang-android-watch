@@ -4,6 +4,7 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SessionRuntime
 import app.zhanzhuang.timer.model.SyncEnvelope
 import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
@@ -121,6 +122,25 @@ class WearSyncCoordinatorTest {
 
         assertEquals(0, controller.finishCalls)
         assertTrue(transport.messages.isEmpty())
+    }
+
+    @Test
+    fun runtimePublicationCarriesOnlyAnEphemeralAuthoritativeTimerAnchor() = runTest {
+        val transport = FakeTransport()
+        val runtime = SessionRuntime(
+            sessionId = "session-1",
+            revision = 4,
+            status = SessionStatus.RUNNING,
+            activeDurationMs = 120_000L,
+            remainingMs = 1_680_000L,
+            reportedAtEpochMillis = 20_000L,
+        )
+
+        assertTrue(WearSyncCoordinator(FakeOutbox(), transport).publishRuntime(runtime))
+
+        val message = transport.messages.single()
+        assertEquals("session-1", message.sessionId)
+        assertEquals(runtime, (message.payload as SyncPayload.Runtime).runtime)
     }
 
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(

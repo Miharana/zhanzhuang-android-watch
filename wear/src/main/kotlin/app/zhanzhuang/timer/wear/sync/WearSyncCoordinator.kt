@@ -6,6 +6,7 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SessionRuntime
 import app.zhanzhuang.timer.model.SyncEnvelope
 import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
@@ -77,6 +78,7 @@ class WearSyncCoordinator(
                 }
             }
             is SyncPayload.State -> mergeRemote(payload.record)
+            is SyncPayload.Runtime -> false
             is SyncPayload.Completed -> mergeRemote(payload.record)
         }
         if (handled) rememberEvent(envelope.eventId)
@@ -85,6 +87,22 @@ class WearSyncCoordinator(
 
     suspend fun resendCompleted(): Boolean = mutex.withLock {
         outbox.pendingCompleted().all { entry -> transport.putCompleted(entry.envelope) }
+    }
+
+    /** Best-effort immediate terminal state; completed DataItem outbox remains the durable fallback. */
+    suspend fun publishState(record: SessionRecord): Boolean = mutex.withLock { sendState(record, sourceNodeId = null) }
+
+    /** Sends a low-frequency FGS runtime update without mutating the durable session revision. */
+    suspend fun publishRuntime(runtime: SessionRuntime): Boolean = mutex.withLock {
+        transport.sendMessage(
+            SyncEnvelope(
+                eventId = UUID.randomUUID().toString(),
+                sessionId = runtime.sessionId,
+                revision = runtime.revision,
+                sentAtEpochMillis = runtime.reportedAtEpochMillis,
+                payload = SyncPayload.Runtime(runtime),
+            ),
+        )
     }
 
     private suspend fun acknowledge(eventId: String, sessionId: String, envelopeRevision: Long, acceptedRevision: Long): Boolean {

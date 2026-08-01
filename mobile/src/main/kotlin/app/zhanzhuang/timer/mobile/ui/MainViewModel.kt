@@ -11,6 +11,7 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SessionRuntime
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,10 @@ interface WatchConnectionPort {
     val states: Flow<WatchConnectionState>
 }
 
+interface WearRuntimePort {
+    val states: Flow<SessionRuntime?>
+}
+
 interface HealthPermissionPort {
     suspend fun state(required: Set<String>): HealthPermissionState
 }
@@ -38,7 +43,7 @@ interface TrainingDefaults {
 }
 
 interface MobileTrainingActions {
-    suspend fun start(config: SessionConfig): SessionRecord
+    suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord
     suspend fun pause(record: SessionRecord)
     suspend fun resume(record: SessionRecord)
     suspend fun finish(record: SessionRecord, cancelled: Boolean)
@@ -79,6 +84,7 @@ class MainViewModel(
     private val trainingActions: MobileTrainingActions,
     private val defaults: TrainingDefaults,
     private val watchConnection: WatchConnectionPort,
+    private val wearRuntime: WearRuntimePort,
     private val healthGateway: HealthConnectGateway,
     private val healthPermission: HealthPermissionPort,
     private val reconcileHealth: suspend () -> Unit,
@@ -93,6 +99,7 @@ class MainViewModel(
     private var records: List<SessionRecord> = emptyList()
     private var controllerState = MobileSessionUiState()
     private var connection = WatchConnectionState(connected = false)
+    private var remoteRuntime: SessionRuntime? = null
 
     init {
         viewModelScope.launch {
@@ -122,6 +129,12 @@ class MainViewModel(
                 refreshTrainingFromSources()
             }
         }
+        viewModelScope.launch {
+            wearRuntime.states.collect {
+                remoteRuntime = it
+                refreshTrainingFromSources()
+            }
+        }
         refreshHealthStatus()
     }
 
@@ -134,7 +147,7 @@ class MainViewModel(
     fun selectInterval(minutes: Int) = updateConfig { it.copy(intervalMinutes = minutes) }
 
     fun start() = viewModelScope.launch {
-        val record = trainingActions.start(state.value.training.config)
+        val record = trainingActions.start(state.value.training.config, state.value.training.watchConnected)
         update { copy(training = training.copy(session = record, activeElapsedMs = record.activeDurationMs, remainingMs = durationMs(record) - record.activeDurationMs)) }
     }
 
@@ -185,14 +198,30 @@ class MainViewModel(
 
     private fun refreshTrainingFromSources() {
         val repositoryActive = records.firstOrNull { it.status in ACTIVE_STATUSES }
+        val repositoryTerminal = records.firstOrNull { it.status in TERMINAL_STATUSES }
         val bridged = controllerState.session
-        val authoritative = when {
+        val durable = when {
             repositoryActive != null && (bridged == null || bridged.id != repositoryActive.id || bridged.status !in ACTIVE_STATUSES) -> repositoryActive
             bridged != null -> bridged
-            else -> null
+            else -> repositoryTerminal
         }
-        val active = if (bridged?.id == authoritative?.id) controllerState.activeElapsedMs else authoritative?.activeDurationMs ?: 0
-        val remaining = if (bridged?.id == authoritative?.id) controllerState.remainingMs else authoritative?.let(::durationMs)?.minus(active)?.coerceAtLeast(0) ?: 0
+        val runtime = remoteRuntime?.takeIf {
+            durable?.owner == SessionOwner.WEAR &&
+                it.sessionId == durable.id &&
+                it.revision >= durable.revision &&
+                it.status in ACTIVE_STATUSES
+        }
+        val authoritative = runtime?.let { durable?.copy(status = it.status, activeDurationMs = it.activeDurationMs) } ?: durable
+        val active = when {
+            bridged?.id == authoritative?.id -> controllerState.activeElapsedMs
+            runtime != null -> runtime.activeDurationMs
+            else -> authoritative?.activeDurationMs ?: 0
+        }
+        val remaining = when {
+            bridged?.id == authoritative?.id -> controllerState.remainingMs
+            runtime != null -> runtime.remainingMs
+            else -> authoritative?.let(::durationMs)?.minus(active)?.coerceAtLeast(0) ?: 0
+        }
         update {
             copy(training = training.copy(
                 session = authoritative,
@@ -209,5 +238,6 @@ class MainViewModel(
 
     private companion object {
         val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }

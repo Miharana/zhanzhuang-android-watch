@@ -32,6 +32,7 @@ import app.zhanzhuang.timer.mobile.session.MobileSessionService
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiBridge
 import app.zhanzhuang.timer.mobile.sync.MobileSyncCoordinator
 import app.zhanzhuang.timer.mobile.sync.MobileSyncRuntime
+import app.zhanzhuang.timer.mobile.sync.MobileWearRuntimeBridge
 import app.zhanzhuang.timer.mobile.ui.HealthPermissionPort
 import app.zhanzhuang.timer.mobile.ui.MainViewModel
 import app.zhanzhuang.timer.mobile.ui.MobileDestination
@@ -39,6 +40,7 @@ import app.zhanzhuang.timer.mobile.ui.MobileTrainingActions
 import app.zhanzhuang.timer.mobile.ui.SharedPreferencesTrainingDefaults
 import app.zhanzhuang.timer.mobile.ui.WatchConnectionPort
 import app.zhanzhuang.timer.mobile.ui.WatchConnectionState
+import app.zhanzhuang.timer.mobile.ui.WearRuntimePort
 import app.zhanzhuang.timer.mobile.ui.components.GoldSparkle
 import app.zhanzhuang.timer.mobile.ui.screens.HistoryScreen
 import app.zhanzhuang.timer.mobile.ui.screens.SessionDetailScreen
@@ -129,12 +131,14 @@ private class MainViewModelFactory(private val context: Context) : ViewModelProv
                 .build(),
         )
         val gateway = AndroidHealthConnectGateway(context)
+        val coordinator = MobileSyncRuntime.get(context)
         return MainViewModel(
             repository = repository,
             serviceState = MobileSessionUiBridge.state,
-            trainingActions = AndroidTrainingActions(context, MobileSyncRuntime.get(context)),
+            trainingActions = AndroidTrainingActions(context, coordinator),
             defaults = SharedPreferencesTrainingDefaults(context),
-            watchConnection = AndroidWatchConnectionPort(context),
+            watchConnection = AndroidWatchConnectionPort(context, coordinator),
+            wearRuntime = object : WearRuntimePort { override val states = MobileWearRuntimeBridge.runtime },
             healthGateway = gateway,
             healthPermission = AndroidHealthPermissionPort(context),
             reconcileHealth = { HealthSyncWorker.reconcile(context) },
@@ -148,7 +152,8 @@ private class AndroidTrainingActions(
     private val context: Context,
     private val coordinator: MobileSyncCoordinator,
 ) : MobileTrainingActions {
-    override suspend fun start(config: SessionConfig): SessionRecord = coordinator.startFromMobile(config)
+    override suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord =
+        if (watchReachable) coordinator.startFromMobile(config) else coordinator.startOnMobile(config)
 
     override suspend fun pause(record: SessionRecord) {
         if (record.owner == SessionOwner.WEAR) coordinator.requestPause(record.id)
@@ -182,17 +187,27 @@ private class AndroidHealthPermissionPort(private val context: Context) : Health
     }
 }
 
-private class AndroidWatchConnectionPort(context: Context) : WatchConnectionPort {
+private class AndroidWatchConnectionPort(
+    context: Context,
+    private val coordinator: MobileSyncCoordinator,
+) : WatchConnectionPort {
     private val applicationContext = context.applicationContext
     override val states = callbackFlow {
         val client = Wearable.getCapabilityClient(applicationContext)
-        val listener = CapabilityClient.OnCapabilityChangedListener { capability -> trySend(capability.toConnection()) }
+        var wasConnected = false
+        fun publish(capability: CapabilityInfo?) {
+            val connection = capability?.toConnection() ?: WatchConnectionState(connected = false)
+            val reconnected = connection.connected && !wasConnected
+            wasConnected = connection.connected
+            trySend(connection)
+            if (reconnected) launch { runCatching { coordinator.queryCurrentWearState() } }
+        }
+        val listener = CapabilityClient.OnCapabilityChangedListener(::publish)
         client.addListener(listener, CAPABILITY)
         launch {
             runCatching { client.getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await() }
                 .getOrNull()
-                ?.let { trySend(it.toConnection()) }
-                ?: trySend(WatchConnectionState(connected = false))
+                .let(::publish)
         }
         awaitClose { client.removeListener(listener, CAPABILITY) }
     }.distinctUntilChanged()

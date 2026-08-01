@@ -9,6 +9,8 @@ import app.zhanzhuang.timer.mobile.health.HealthWriteResult
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiState
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionOwner
+import app.zhanzhuang.timer.model.SessionRuntime
 import app.zhanzhuang.timer.model.SessionStatus
 import java.time.Instant
 import java.time.ZoneId
@@ -66,15 +68,79 @@ class MainViewModelTest {
         assertEquals(1_725_000L, model.state.value.training.remainingMs)
     }
 
+    @Test
+    fun watchRuntimeRefreshesActiveProgressAndPauseFreezesTheServiceReportedValue() = runTest(dispatcher) {
+        val runtime = MutableStateFlow<SessionRuntime?>(null)
+        val record = SessionRecord(
+            id = "watch-session",
+            revision = 4,
+            config = SessionConfig(),
+            status = SessionStatus.RUNNING,
+            owner = SessionOwner.WEAR,
+            activeDurationMs = 60_000L,
+        )
+        val model = model(repository = FakeRepository(listOf(record)), runtime = runtime)
+        advanceUntilIdle()
+
+        runtime.value = SessionRuntime("watch-session", 4, SessionStatus.RUNNING, 120_000L, 1_680_000L, 10_000L)
+        advanceUntilIdle()
+        assertEquals(120_000L, model.state.value.training.activeElapsedMs)
+        assertEquals(1_680_000L, model.state.value.training.remainingMs)
+
+        runtime.value = SessionRuntime("watch-session", 4, SessionStatus.PAUSED, 120_000L, 1_680_000L, 15_000L)
+        advanceUntilIdle()
+        assertEquals(SessionStatus.PAUSED, model.state.value.training.session?.status)
+        assertEquals(120_000L, model.state.value.training.activeElapsedMs)
+    }
+
+    @Test
+    fun disconnectedStartPassesAnAuthoritativeOfflineRouteToTrainingActions() = runTest(dispatcher) {
+        val actions = RecordingActions()
+        val model = model(actions = actions)
+        advanceUntilIdle()
+
+        model.start()
+        advanceUntilIdle()
+
+        assertEquals(listOf(false), actions.watchReachability)
+    }
+
+    @Test
+    fun reconnectRuntimeCatchesUpAndTerminalRepositoryStateSupersedesTheEphemeralCountdown() = runTest(dispatcher) {
+        val runtime = MutableStateFlow<SessionRuntime?>(null)
+        val repository = FakeRepository(listOf(watchRecord()))
+        val watch = FakeWatchConnection(false)
+        val model = model(repository = repository, runtime = runtime, watch = watch)
+        advanceUntilIdle()
+        runtime.value = SessionRuntime("watch-session", 4, SessionStatus.RUNNING, 120_000L, 1_680_000L, 10_000L)
+        advanceUntilIdle()
+
+        watch.publish(connected = true)
+        runtime.value = SessionRuntime("watch-session", 4, SessionStatus.RUNNING, 180_000L, 1_620_000L, 20_000L)
+        advanceUntilIdle()
+        assertEquals(true, model.state.value.training.watchConnected)
+        assertEquals(180_000L, model.state.value.training.activeElapsedMs)
+
+        repository.publish(listOf(watchRecord().copy(revision = 5, status = SessionStatus.COMPLETED, activeDurationMs = 180_000L)))
+        advanceUntilIdle()
+        assertEquals(SessionStatus.COMPLETED, model.state.value.training.session?.status)
+        assertEquals(180_000L, model.state.value.training.activeElapsedMs)
+    }
+
     private fun model(
         bridge: StateFlow<MobileSessionUiState> = MutableStateFlow(MobileSessionUiState()),
         permission: FakePermission = FakePermission(),
+        repository: FakeRepository = FakeRepository(),
+        runtime: MutableStateFlow<SessionRuntime?> = MutableStateFlow(null),
+        actions: MobileTrainingActions = FakeActions(),
+        watch: FakeWatchConnection = FakeWatchConnection(false),
     ) = MainViewModel(
-        repository = FakeRepository(),
+        repository = repository,
         serviceState = bridge,
-        trainingActions = FakeActions(),
+        trainingActions = actions,
         defaults = FakeDefaults(),
-        watchConnection = FakeWatchConnection(),
+        watchConnection = watch,
+        wearRuntime = FakeWearRuntime(runtime),
         healthGateway = FakeGateway(),
         healthPermission = permission,
         reconcileHealth = {},
@@ -82,12 +148,14 @@ class MainViewModelTest {
         zoneId = { ZoneId.of("Europe/London") },
     )
 
-    private class FakeRepository : SessionRepository {
-        override fun observeSessions(): Flow<List<SessionRecord>> = flowOf(emptyList())
-        override suspend fun get(id: String): SessionRecord? = null
-        override suspend fun activeSession(): SessionRecord? = null
+    private class FakeRepository(records: List<SessionRecord> = emptyList()) : SessionRepository {
+        private val mutableRecords = MutableStateFlow(records)
+        override fun observeSessions(): Flow<List<SessionRecord>> = mutableRecords
+        override suspend fun get(id: String): SessionRecord? = mutableRecords.value.firstOrNull { it.id == id }
+        override suspend fun activeSession(): SessionRecord? = mutableRecords.value.firstOrNull { it.status in setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING) }
         override suspend fun runtimeSnapshot(): MobileRuntimeSnapshot? = null
         override suspend fun upsert(record: SessionRecord, runtimeSnapshot: MobileRuntimeSnapshot?) = Unit
+        fun publish(records: List<SessionRecord>) { mutableRecords.value = records }
     }
 
     private class FakeDefaults : TrainingDefaults {
@@ -96,12 +164,29 @@ class MainViewModelTest {
         override fun save(config: SessionConfig) { mutable.value = config }
     }
 
-    private class FakeWatchConnection : WatchConnectionPort {
-        override val states: Flow<WatchConnectionState> = flowOf(WatchConnectionState(false))
+    private class FakeWatchConnection(connected: Boolean) : WatchConnectionPort {
+        private val mutable = MutableStateFlow(WatchConnectionState(connected))
+        override val states: Flow<WatchConnectionState> = mutable
+        fun publish(connected: Boolean) { mutable.value = WatchConnectionState(connected) }
+    }
+
+    private class FakeWearRuntime(private val runtime: MutableStateFlow<SessionRuntime?>) : WearRuntimePort {
+        override val states: Flow<SessionRuntime?> = runtime
     }
 
     private class FakeActions : MobileTrainingActions {
-        override suspend fun start(config: SessionConfig): SessionRecord = SessionRecord(config = config, status = SessionStatus.STARTING)
+        override suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord = SessionRecord(config = config, status = SessionStatus.STARTING)
+        override suspend fun pause(record: SessionRecord) = Unit
+        override suspend fun resume(record: SessionRecord) = Unit
+        override suspend fun finish(record: SessionRecord, cancelled: Boolean) = Unit
+    }
+
+    private class RecordingActions : MobileTrainingActions {
+        val watchReachability = mutableListOf<Boolean>()
+        override suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord {
+            watchReachability += watchReachable
+            return SessionRecord(config = config, status = SessionStatus.RUNNING)
+        }
         override suspend fun pause(record: SessionRecord) = Unit
         override suspend fun resume(record: SessionRecord) = Unit
         override suspend fun finish(record: SessionRecord, cancelled: Boolean) = Unit
@@ -118,4 +203,13 @@ class MainViewModelTest {
 
         companion object { val permissions = setOf("write-session", "write-heart-rate") }
     }
+
+    private fun watchRecord() = SessionRecord(
+        id = "watch-session",
+        revision = 4,
+        config = SessionConfig(),
+        status = SessionStatus.RUNNING,
+        owner = SessionOwner.WEAR,
+        activeDurationMs = 60_000L,
+    )
 }

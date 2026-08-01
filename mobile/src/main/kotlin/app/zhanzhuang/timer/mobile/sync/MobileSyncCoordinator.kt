@@ -40,6 +40,7 @@ class MobileSyncCoordinator(
     private val scope: CoroutineScope,
     private val nowEpochMillis: () -> Long,
     private val resolver: SyncConflictResolver = SyncConflictResolver(),
+    private val runtimeSink: (app.zhanzhuang.timer.model.SessionRuntime) -> Unit = MobileWearRuntimeBridge::publish,
 ) {
     private val seenEventIds = LinkedHashSet<String>()
     private val fallbackJobs = mutableMapOf<String, Job>()
@@ -60,6 +61,33 @@ class MobileSyncCoordinator(
             }
         }
         return record
+    }
+
+    /**
+     * Offline start path. It reserves the same durable session ID first, then
+     * immediately hands that reservation to the phone foreground service.
+     */
+    suspend fun startOnMobile(config: SessionConfig): SessionRecord = mutex.withLock {
+        val sessionId = UUID.randomUUID().toString()
+        controller.startFromMobile(config, sessionId, revision = 1)
+        return requireNotNull(controller.becomeMobileOwner(sessionId)) {
+            "The locally reserved session was not available for phone ownership"
+        }.also { started ->
+            check(started.id == sessionId && started.owner == SessionOwner.MOBILE) {
+                "Phone ownership changed the reserved session identity"
+            }
+        }
+    }
+
+    /**
+     * A reachable companion has returned. Ask it for the durable state of an
+     * already watch-owned session; this never starts a foreground service.
+     */
+    suspend fun queryCurrentWearState(): Boolean = mutex.withLock {
+        val current = controller.current()
+            ?.takeIf { it.owner == SessionOwner.WEAR && it.status in ACTIVE_STATUSES }
+            ?: return false
+        transport.sendMessage(envelope(current, SyncPayload.QueryState))
     }
 
     /** Sends a command to a watch-owned session without manufacturing a local timer state. */
@@ -99,6 +127,7 @@ class MobileSyncCoordinator(
             }
             SyncPayload.QueryState -> controller.current()?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
             is SyncPayload.State -> mergeRemote(payload.record)
+            is SyncPayload.Runtime -> receiveRuntime(payload.runtime)
             is SyncPayload.Completed -> processCompleted(envelope, payload, sourceNodeId)
             is SyncPayload.Ack -> true
             SyncPayload.Pause -> {
@@ -163,6 +192,14 @@ class MobileSyncCoordinator(
             ),
             sourceNodeId,
         )
+    }
+
+    private suspend fun receiveRuntime(runtime: app.zhanzhuang.timer.model.SessionRuntime): Boolean {
+        val current = controller.session(runtime.sessionId) ?: return false
+        if (current.owner != SessionOwner.WEAR || current.status in TERMINAL_STATUSES) return false
+        if (runtime.revision < current.revision) return false
+        runtimeSink(runtime)
+        return true
     }
 
     private suspend fun respond(envelope: SyncEnvelope, sourceNodeId: String?): Boolean =

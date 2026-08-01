@@ -286,6 +286,60 @@ class MobileSyncCoordinatorTest {
         assertEquals(SessionStatus.RUNNING, controller.current()!!.status)
     }
 
+    @Test
+    fun disconnectedStartImmediatelyReservesAndStartsOnePhoneOwnedSession() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+
+        val started = coordinator.startOnMobile(SessionConfig())
+
+        assertEquals(SessionOwner.MOBILE, started.owner)
+        assertEquals(SessionStatus.RUNNING, started.status)
+        assertEquals(2, started.revision)
+        assertEquals(0, transport.envelopes.size)
+        assertEquals(started.id, controller.current()!!.id)
+    }
+
+    @Test
+    fun watchRuntimeProgressUpdatesTheRuntimeSinkWithoutReplacingTheDurableOwner() = runTest {
+        val received = mutableListOf<app.zhanzhuang.timer.model.SessionRuntime>()
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR).copy(revision = 4)) }
+        val coordinator = MobileSyncCoordinator(
+            transport = FakeTransport(),
+            controller = controller,
+            scope = this,
+            nowEpochMillis = { 20_000L },
+            runtimeSink = received::add,
+        )
+        val runtime = app.zhanzhuang.timer.model.SessionRuntime(
+            sessionId = "session-1",
+            revision = 4,
+            status = SessionStatus.RUNNING,
+            activeDurationMs = 120_000L,
+            remainingMs = 1_680_000L,
+            reportedAtEpochMillis = 20_000L,
+        )
+
+        assertTrue(coordinator.receiveCommand(envelope("runtime-1", 4, app.zhanzhuang.timer.model.SyncPayload.Runtime(runtime))))
+
+        assertEquals(listOf(runtime), received)
+        assertEquals(SessionOwner.WEAR, controller.owner())
+        assertEquals(SessionStatus.RUNNING, controller.current()!!.status)
+    }
+
+    @Test
+    fun reachableWatchReconnectQueriesTheExistingWearSessionWithoutStartingAService() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 20_000L })
+
+        assertTrue(coordinator.queryCurrentWearState())
+
+        assertEquals("QUERY_STATE", transport.sentPayloadNames.single())
+        assertEquals(SessionOwner.WEAR, controller.owner())
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -354,7 +408,7 @@ class MobileSyncCoordinatorTest {
         }
 
         override suspend fun becomeMobileOwner(sessionId: String): SessionRecord? =
-            record.takeIf { it.id == sessionId }?.copy(owner = SessionOwner.MOBILE, revision = record.revision + 1)
+            record.takeIf { it.id == sessionId }?.copy(owner = SessionOwner.MOBILE, status = SessionStatus.RUNNING, revision = record.revision + 1)
                 ?.also { record = it }
 
         override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record.also { this.record = it }
