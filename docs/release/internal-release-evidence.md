@@ -116,3 +116,33 @@ dashboard is available, the continuation is:
 | Mobile | `internal` | — | Not read: app is not accessible to the available credential/session. |
 | Wear OS | dedicated internal track | — | Not read: exact track is unknown; no upload attempted. |
 | Production | `production` | — | No committed production release, track, metadata, or binary mutation; only the uncommitted transient edit probes above occurred. |
+
+## Continuation read-only access audit — 2026-08-01
+
+The persistent release goal rechecked every locally available owner and service
+credential without opening a Publisher edit:
+
+- Google Application Default Credentials are present, can mint an access token,
+  and the token has the Android Publisher OAuth scope. The read-only
+  `reviews.list` endpoint returned `403 PERMISSION_DENIED` for both
+  `app.zhanzhuang.timer` and the known Miharana control package.
+- The currently active gcloud user token returned the same `403` result for
+  both packages. These two user credential paths therefore have no usable app
+  access in the current Play developer account.
+- The repository-external Miharana service-account credential returned HTTP 200
+  for the known Miharana control package and HTTP 404 for
+  `app.zhanzhuang.timer` through the same read-only `reviews.list` request. This
+  reconfirms that the credential itself is functional while the target package
+  remains absent from or unavailable to that Play account.
+- A fresh, read-only Chrome snapshot still shows **Creating a Play Console
+  developer account** at `https://play.google.com/console/signup`. The page is
+  waiting for an organisation-versus-personal account decision before identity,
+  terms, and payment setup. No choice was clicked, no form was filled, and no
+  account or billing mutation was made. The live tab was left open as a handoff
+  for the account owner.
+
+Unlike the earlier track checks, these continuation probes created no Android
+Publisher edit and performed no remote write. Until the owner completes the
+developer-account registration and grants target-app access, there is no safe
+API or Console path to create/read the target app, discover the dedicated Wear
+track, upload either AAB, or perform Play-delivered Pixel Watch 4 QA.

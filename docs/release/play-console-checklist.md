@@ -60,3 +60,9 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 - [ ] The signed candidate hashes and this attempt are recorded in
   `internal-release-evidence.md`. No production release, track, metadata, or
   binary was committed.
+- [x] A later read-only access audit exhausted both gcloud user credential
+  paths and the available repository-external service account without opening
+  an edit. The service account still reads its known control package (HTTP 200)
+  but the target returns HTTP 404; both user tokens return 403 for both
+  packages. The live Console remains at the account-type step of developer
+  account signup, with no form submission or billing/account mutation.
