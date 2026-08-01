@@ -1,80 +1,49 @@
-# Google Play Console checklist — first internal release
+# Google Play Console checklist — first public release
 
-Release identity:
+Release: `app.zhanzhuang.timer` version `0.1.0`
 
-- Package: `app.zhanzhuang.timer`
-- Version name: `0.1.0`
-- Mobile version code: `1000001`
-- Wear OS version code: `2000001`
-- Intended initial mobile track: `internal`, completed (not staged)
+## Completed
 
-## Before any upload
+- [x] Reused the existing **Urticad Tech Ltd** organisation developer account.
+- [x] Created the Play app record and enrolled the app in Play App Signing.
+- [x] Granted the existing external Fastlane service account least-privilege,
+  app-scoped access, including production release permission.
+- [x] Verified the signed phone (`1000001`) and Wear (`2000001`) AABs and their
+  upload certificate outside the repository.
+- [x] Published and entered the bilingual HTTPS privacy policy.
+- [x] Uploaded `en-GB`, `en-US`, and `zh-CN` listings, icons, graphics, phone
+  screenshots, Wear screenshots, and changelogs.
+- [x] Completed app access, ads, content rating, target audience, Data safety,
+  Advertising ID (No), government, finance, Health apps, regional, and
+  foreground-service forms.
+- [x] Set Health & fitness category and public contact details.
+- [x] Opted into Wear OS and selected all supported production countries.
+- [x] Published phone `internal` code `1000001` and Wear `wear:internal` code
+  `2000001` with completed status; activated the tester list.
+- [x] Promoted both immutable internal candidates to draft production tracks.
+- [x] Previewed and saved the phone and Wear full-rollout changes with zero
+  blocking release errors.
 
-- [x] Use the existing **Urticad Tech Ltd** organisation developer account that
-  already ships Miharana (`com.urticad.miharana`). Do not create a duplicate
-  Play account. The owner identity is `wangyal@urticad.com`; the currently
-  open browser handoff is waiting for its passkey/security verification.
-- [ ] Confirm the package is available or the correct Play app record is registered under the verified developer account.
-- [ ] Enroll in Play App Signing and record the Play signing certificate separately from the local upload-certificate fingerprint.
-- [ ] Confirm the external upload key path and certificate, then run `scripts/verify_release.sh` with credentials only in the verification shell.
-- [ ] Complete developer identity/verification requirements in Play Console.
-- [ ] Complete the Health apps declaration: optional informational heart-rate collection on Wear and optional write-only Health Connect mindfulness-session output (exercise-session fallback where mindfulness is unavailable) plus heart-rate output; no Health Connect reads.
-- [ ] Complete Data safety truthfully: no account, ads, analytics, cloud storage, or sale; local device/watch storage and optional Health Connect sharing only when the user grants it.
-- [ ] Complete the content rating questionnaire truthfully.
-- [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `5c67d0f4-9644-4e8e-8b05-8620351dc62f`, source commit `aee4218`).
-- [ ] Add the published privacy URL in Play Console and verify the established
-  Urticad public developer contact route, `wangyal@urticad.com`.
-- [ ] Upload both bilingual listing locales, icon, feature graphic, phone screenshots, Wear screenshots, and changelogs.
-- [ ] Add internal testers and verify their access before uploading a binary.
-- [ ] Opt the app into Wear OS distribution and confirm the exact dedicated Wear form-factor track identifier in Play Console/API. Do not infer or guess that track.
+## Current first-review state
 
-## After upload / before a completion claim
+- [x] Cleared the sole automated-check blocker by completing Advertising ID as
+  No, consistent with both signed bundle manifests.
+- [x] Submitted all 15 staged changes for Google review; Publishing overview
+  shows **Changes in review** and **15 changes sent for review**.
+- [x] Read back Android Publisher tracks: `internal` `completed:1000001`,
+  `wear:internal` `completed:2000001`, `production` `completed:1000001`, and
+  `wear:production` `completed:2000001`.
+- [x] Confirmed the automated quick-check progress and issue panel disappeared
+  while all changes remained under **Changes in review**.
+- [ ] Wait for Google first-app review to complete. Play says reviews are
+  typically completed within seven days but may take longer.
+- [ ] After Google approval, verify whether managed-publishing-off caused
+  automatic publication; if not, explicitly publish the approved changes.
+- [ ] Verify the public Play listing and production install on a phone and a
+  paired Pixel Watch 4.
 
-- [ ] Use `fastlane android publish_metadata` only with a repository-external `SUPPLY_JSON_KEY` file.
-- [ ] Use `fastlane android upload_mobile_internal` once for the signed mobile AAB; it uploads no metadata or images and targets `internal` with `completed` status.
-- [ ] Do not upload the Wear AAB until Task 12 records the exact dedicated Wear track identifier from Play Console/API.
-- [ ] Read back the remote mobile and Wear release state, version codes, processing/review state, and package/form-factor assignment. A successful Fastlane process is not proof of a completed Play release.
-- [ ] Install from internal testing on a paired Pixel Watch and phone. Physical Pixel Watch screen-off, disconnect/reconnect, permissions-denied, process-death, reboot, and 15/30/180-minute evidence remain blocked until actually observed; emulator evidence cannot close those rows.
+Internal opt-in URL:
+<https://play.google.com/apps/internaltest/4701473602939953272>
 
-## First-binary constraint
-
-Google Play may require a manual Play Console app/bootstrap before the first binary can be accepted. The Fastlane lanes prepare uploads but cannot create or verify that console setup on their own.
-
-## Task 12 verification attempt — 2026-08-01 UTC
-
-- [x] The public bilingual privacy-policy prerequisite is complete at
-  <https://zhanzhuang-privacy.artlinx.workers.dev>. Remote readback returned
-  HTTP 200 and confirmed the policy title, package scope, Health Connect
-  disclosure (mindfulness session, exercise fallback, and heart-rate samples),
-  Chinese copy, and absence of the development preview marker. Plain HTTP
-  redirects permanently to HTTPS and HTTPS responses include HSTS.
-- [ ] Package/app registration is still unconfirmed. The specified Zhan Zhuang
-  repository-external service-account file was absent; a separate external
-  candidate can read a known Miharana Play app but returned
-  `package-not-found-or-not-authorized` for this package. The target is either
-  unregistered or not yet granted to that credential; the API response does
-  not distinguish those states. This verification necessarily created two
-  transient Publisher edits; neither had an `edit.commit` call or any uploaded
-  binary, metadata, or asset.
-- [ ] Play Console owner authentication is pending. The earlier **Creating a
-  developer account** page belonged to the wrong signed-in Google identity and
-  did not mean the Urticad developer account was absent. Chrome is now waiting
-  for the `wangyal@urticad.com` passkey/security check. No account, app record,
-  declaration, tester, listing, asset, or binary was submitted in this task.
-- [ ] The exact Wear OS dedicated internal track is not known. It must be read
-  from the authorized Console/API before a Wear AAB upload.
-- [ ] The signed candidate hashes and this attempt are recorded in
-  `internal-release-evidence.md`. No production release, track, metadata, or
-  binary was committed.
-- [x] A later read-only access audit exhausted the current ADC, two non-active
-  legacy ADC files, the active gcloud user token, and both discovered
-  repository-external service-account paths without opening an edit. All user
-  tokens return 403 for the target and control packages. The two service-account
-  files are byte-identical; that single credential reads its known control
-  package (HTTP 200) but the target returns HTTP 404. That apparent signup route
-  was traced to the wrong browser identity; the live Console handoff now targets
-  the existing Urticad owner and waits only for its passkey/security check.
-- [x] The account route is resolved: reuse the existing Urticad Tech Ltd
-  organisation account and its proven Miharana/Fastlane release infrastructure.
-  Only owner authentication, target-app creation, and explicit target-app
-  service-account authorization remain before the automated upload can start.
+The two release-page warnings (missing R8 mapping and native symbols) are
+non-blocking diagnostics. They are recorded in `internal-release-evidence.md`.

@@ -40,7 +40,7 @@ worktree_risk=$(find . -path './.git' -prune -o \( -name '*.jks' -o -name '*.key
 raw_signing=$(git grep -nE 'ZHANZHUANG_(STORE|KEY)_PASSWORD[[:space:]]*=[^[:space:]]+' -- ':!scripts/verify_release.sh' ':!scripts/tests/verify_release_contract_test.sh' || true)
 [[ -z "$raw_signing" ]] || fail 'tracked files contain a raw signing-password assignment'
 
-for locale in en-US zh-CN; do
+for locale in en-GB en-US zh-CN; do
     locale_dir="fastlane/metadata/android/$locale"
     for metadata in title.txt short_description.txt full_description.txt changelogs/1000001.txt changelogs/2000001.txt; do
         require_file "$locale_dir/$metadata"
@@ -77,7 +77,13 @@ done
 require_text fastlane/Fastfile 'upload_mobile_internal'
 require_text fastlane/Fastfile 'publish_metadata'
 require_text fastlane/Fastfile 'app.zhanzhuang.timer'
-require_text fastlane/Fastfile 'wear_upload_disabled'
+require_text fastlane/Fastfile 'upload_wear_internal'
+require_text fastlane/Fastfile 'wear:internal'
+require_text fastlane/Fastfile 'promote_mobile_production'
+require_text fastlane/Fastfile 'track_promote_to: "production"'
+require_text fastlane/Fastfile 'promote_wear_production'
+require_text fastlane/Fastfile 'track_promote_to: "wear:production"'
+require_text fastlane/Fastfile 'track_promote_release_status: "draft"'
 
 ./gradlew test :mobile:lintRelease :wear:lintRelease :mobile:bundleRelease :wear:bundleRelease
 
@@ -127,6 +133,7 @@ verify_bundle_manifest() {
     [[ "$manifest" == *'targetSdkVersion="36"'* ]] || fail "$module AAB target SDK is incorrect"
     [[ "$manifest" == *'android.permission.INTERNET'* ]] && fail "$module AAB must not request INTERNET"
     [[ "$manifest" == *'android.permission.ACCESS_FINE_LOCATION'* ]] && fail "$module AAB must not request location"
+    [[ "$manifest" == *'com.google.android.gms.permission.AD_ID'* ]] && fail "$module AAB must not request Advertising ID"
     localized_resources="$module/build/intermediates/packaged_res/release/packageReleaseResources/values-zh-rCN/values-zh-rCN.xml"
     require_file "$localized_resources"
     require_text "$localized_resources" '站桩'

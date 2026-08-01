@@ -1,0 +1,7 @@
+Zhan Zhuang Timer is a quiet standing-practice timer for sessions from 15 minutes to 3 hours. Choose a duration and a reminder interval, then receive gentle haptic cues for the start, each interval, and completion. There are no sounds, ads, accounts, subscriptions, or premium tiers.
+
+When used on a paired Wear OS watch, optional heart-rate information can be recorded during a session. It is informational session data only and is not medical advice. You can continue a duration-only session if heart-rate permission is not granted.
+
+Your session history is stored locally on your phone and paired watch. The app does not use cloud storage, analytics, advertising SDKs, or an account. You can clear local app storage in Android system settings or uninstall the app to remove local app data.
+
+Health Connect is optional. If you choose to grant its write permissions, completed sessions and available heart-rate samples can be written to Health Connect. The app does not read health data from other apps.
