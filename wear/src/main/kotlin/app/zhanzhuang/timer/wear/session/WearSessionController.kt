@@ -55,6 +55,7 @@ interface WearSessionRecordStore {
     suspend fun upsert(record: SessionRecord)
     suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String)
     suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String)
+    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>)
 }
 
 class WearSessionControllerImpl(
@@ -81,6 +82,7 @@ class WearSessionControllerImpl(
     private var lastStoredSampleAtBootMs = 0L
     private var samplesSinceStore = 0
     private var heartRateAcceptFromBootMs: Long? = null
+    private val unflushedSamples = mutableListOf<HeartRateSample>()
 
     override suspend fun start(config: SessionConfig, sessionId: String) = mutex.withLock {
         check(record?.status !in ACTIVE_STATUSES) { "A Wear session is already active" }
@@ -199,11 +201,12 @@ class WearSessionControllerImpl(
                     accuracy = SampleAccuracy.HIGH,
                 )
                 record = active.copy(heartRateSamples = active.heartRateSamples + sample)
+                unflushedSamples += sample
                 currentHeartRateBpm = update.bpm
                 samplesSinceStore += 1
                 // Room owns samples; no synchronous growing SharedPreferences history write on callback.
                 if (samplesSinceStore >= SAMPLE_BATCH_COUNT || clock.elapsedRealtimeMs() - lastStoredSampleAtBootMs >= SAMPLE_BATCH_INTERVAL_MS) {
-                    persistSnapshotAndRecord()
+                    persistSampleDelta()
                 } else {
                     publishState()
                 }
@@ -327,6 +330,15 @@ class WearSessionControllerImpl(
         publishState()
     }
 
+    private suspend fun persistSampleDelta() {
+        record = record!!.copy(revision = record!!.revision + 1)
+        records.appendHeartRateBatch(record!!, unflushedSamples.toList())
+        unflushedSamples.clear()
+        lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
+        samplesSinceStore = 0
+        publishState()
+    }
+
     private suspend fun saveSnapshotOnly(snapshotBootId: String = bootId()) {
         snapshots.save(
             WearSessionSnapshot(
@@ -407,4 +419,6 @@ class RepositoryRecordStore(
         repository.enqueueCompleted(eventId, sessionId, revision, payload)
     override suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) =
         repository.completeWithOutbox(record, eventId, payload)
+    override suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) =
+        repository.appendHeartRateBatch(record, samples)
 }

@@ -359,6 +359,9 @@ class WearSessionControllerTest {
             events += "persist:${record.status}"
             events += "outbox:${record.id}"
         }
+        override suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
+            this.record = record
+        }
         fun latest(): SessionRecord? = record
         fun seed(record: SessionRecord) { this.record = record }
     }

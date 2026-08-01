@@ -26,6 +26,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 /** Health foreground service. Only [startIntent] can create a new session; restart paths only recover. */
 class WearSessionService : Service() {
@@ -35,7 +36,7 @@ class WearSessionService : Service() {
     private var ticker: Job? = null
     private lateinit var commands: WearSessionCommandProcessor
     private val requests = Channel<ServiceRequest>(Channel.UNLIMITED)
-    private var generation = 0L
+    private val generation = AtomicLong(0)
 
     override fun onCreate() {
         super.onCreate()
@@ -71,7 +72,7 @@ class WearSessionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = commandFrom(intent) ?: Command.Status
-        val commandGeneration = ++generation
+        val commandGeneration = generation.incrementAndGet()
         // This satisfies the FGS deadline; the recovery-only notification has no OngoingActivity extension.
         startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
         requests.trySend(ServiceRequest.Command(command, startId, commandGeneration))
@@ -88,7 +89,7 @@ class WearSessionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startTicker(startId: Int, tickerGeneration: Long) {
-        if (tickerGeneration != generation) return
+        if (tickerGeneration != generation.get()) return
         ticker?.cancel()
         ticker = serviceScope.launch {
             while (true) {
@@ -99,7 +100,7 @@ class WearSessionService : Service() {
     }
 
     private fun stopIfCurrent(startId: Int, commandGeneration: Long) {
-        if (commandGeneration != generation) return
+        if (commandGeneration != generation.get()) return
         if (stopSelfResult(startId)) {
             ticker?.cancel()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -115,7 +116,7 @@ class WearSessionService : Service() {
                 }
                 ServiceCommandResult.STOP, ServiceCommandResult.REJECTED -> stopIfCurrent(request.startId, request.generation)
             }
-            is ServiceRequest.Tick -> if (request.generation == generation) {
+            is ServiceRequest.Tick -> if (request.generation == generation.get()) {
                 controller.tick()
                 publishForeground(request.generation)
                 if (controller.state.value.record?.status in TERMINAL_STATUSES) stopIfCurrent(request.startId, request.generation)
@@ -124,7 +125,7 @@ class WearSessionService : Service() {
     }
 
     private fun publishForeground(requestGeneration: Long) {
-        if (requestGeneration != generation || controller.state.value.record?.status !in ACTIVE_STATUSES) return
+        if (requestGeneration != generation.get() || controller.state.value.record?.status !in ACTIVE_STATUSES) return
         startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
     }
 

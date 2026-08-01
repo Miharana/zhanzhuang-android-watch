@@ -116,6 +116,13 @@ interface WearSessionDao {
     }
 
     @Transaction
+    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
+        val existing = session(record.id)
+        if (existing == null) insertSession(record.toWearEntity()) else if (record.revision > existing.revision) updateSession(record.toWearEntity())
+        if (samples.isNotEmpty()) saveSamples(samples.map { it.toWearEntity(record.id) })
+    }
+
+    @Transaction
     suspend fun enqueueIfCurrent(entity: OutboxEntity) {
         val currentSession = session(entity.sessionId) ?: return
         if (entity.revision != currentSession.revision) return
@@ -169,6 +176,10 @@ class WearSessionRepository(private val dao: WearSessionDao) {
             record,
             OutboxEntity(eventId = eventId, sessionId = record.id, revision = record.revision, payload = payload),
         )
+    }
+
+    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
+        dao.appendHeartRateBatch(record, samples)
     }
 
     suspend fun pendingOutbox(): List<OutboxEntity> = dao.pendingOutbox()
