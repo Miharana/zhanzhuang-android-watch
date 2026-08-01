@@ -276,6 +276,150 @@ class WearSessionControllerTest {
     }
 
     @Test
+    fun heartRateBatchesContainOnlyNewRowsAndKeepTheHistoryUnion() = runTest {
+        val store = RecordingStore()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(
+            store, RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" },
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        val readsBeforeBatches = store.getCalls
+
+        repeat(40) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        assertEquals(listOf(20, 20), store.checkpointBatches.map(List<HeartRateSample>::size))
+        assertEquals(40, store.latest()!!.heartRateSamples.distinctBy(HeartRateSample::epochMillis).size)
+        assertEquals(40, store.checkpointBatches.flatten().distinctBy(HeartRateSample::epochMillis).size)
+        assertEquals(readsBeforeBatches, store.getCalls)
+    }
+
+    @Test
+    fun pauseFlushesAnUnderfullHeartRateDeltaExactlyOnce() = runTest {
+        val store = RecordingStore()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(
+            store, RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" },
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        repeat(3) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        controller.pause()
+
+        assertEquals(listOf(3), store.checkpointBatches.map(List<HeartRateSample>::size))
+        assertEquals(3, store.latest()!!.heartRateSamples.distinctBy(HeartRateSample::epochMillis).size)
+    }
+
+    @Test
+    fun statusFlushesAnUnderfullHeartRateDeltaExactlyOnce() = runTest {
+        val store = RecordingStore()
+        val snapshots = RecordingSnapshots()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(store, snapshots, RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" })
+        controller.start(SessionConfig(15, 5), "s1")
+        repeat(3) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        WearSessionCommandProcessor(controller).process(WearSessionService.Command.Status, "boot")
+
+        assertEquals(listOf(3), store.checkpointBatches.map(List<HeartRateSample>::size))
+    }
+
+    @Test
+    fun finishFlushesAnUnderfullHeartRateDeltaExactlyOnce() = runTest {
+        val store = RecordingStore()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(store, RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" })
+        controller.start(SessionConfig(15, 5), "s1")
+        repeat(3) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        controller.finish()
+
+        assertEquals(listOf(3), store.checkpointBatches.map(List<HeartRateSample>::size))
+    }
+
+    @Test
+    fun thirtySecondBatchesAppendOnlyNewRows() = runTest {
+        val store = RecordingStore()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(store, RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" })
+        controller.start(SessionConfig(15, 5), "s1")
+        repeat(2) { offset ->
+            clock.advanceBy(30_000)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        assertEquals(listOf(1, 1), store.checkpointBatches.map(List<HeartRateSample>::size))
+        assertEquals(2, store.latest()!!.heartRateSamples.size)
+    }
+
+    @Test
+    fun snapshotCarriesOnlyTheBoundedUnflushedTail() = runTest {
+        val snapshots = RecordingSnapshots()
+        val clock = AdjustableClock()
+        val store = RecordingStore()
+        val controller = WearSessionControllerImpl(
+            store, snapshots, RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" },
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        store.failNextCheckpoint = true
+        repeat(20) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        assertTrue(snapshots.snapshot!!.record.heartRateSamples.isEmpty())
+        assertEquals(20, snapshots.snapshot!!.pendingHeartRateSamples.size)
+    }
+
+    @Test
+    fun underfullHeartRateCallbacksDoNotWriteSnapshots() = runTest {
+        val snapshots = RecordingSnapshots()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(
+            RecordingStore(), snapshots, RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" },
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        val writesAfterStart = snapshots.saveCount
+
+        repeat(19) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+
+        assertEquals(writesAfterStart, snapshots.saveCount)
+    }
+
+    @Test
+    fun failedHealthPersistenceRetainsTheDeltaForTheNextUpdate() = runTest {
+        val store = RecordingStore()
+        val clock = AdjustableClock()
+        val controller = WearSessionControllerImpl(
+            store, RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(), bootId = { "boot" },
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        store.failNextCheckpoint = true
+        repeat(20) { offset ->
+            clock.advanceBy(1)
+            controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(60.0 + offset, clock.elapsedRealtimeMs()))
+        }
+        clock.advanceBy(1)
+        controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(81.0, clock.elapsedRealtimeMs()))
+
+        assertEquals(20, store.checkpointBatches.single().size)
+    }
+
+    @Test
     fun pauseAndResumeActionsAreParsed() {
         assertEquals(WearSessionService.Command.Pause, WearSessionService.commandFrom(Intent(WearSessionService.ACTION_PAUSE)))
         assertEquals(WearSessionService.Command.Resume, WearSessionService.commandFrom(Intent(WearSessionService.ACTION_RESUME)))
@@ -346,7 +490,13 @@ class WearSessionControllerTest {
 
     private class RecordingStore(private val events: MutableList<String> = mutableListOf()) : WearSessionRecordStore {
         private var record: SessionRecord? = null
-        override suspend fun get(id: String): SessionRecord? = record?.takeIf { it.id == id }
+        val checkpointBatches = mutableListOf<List<HeartRateSample>>()
+        var failNextCheckpoint = false
+        var getCalls = 0
+        override suspend fun get(id: String): SessionRecord? {
+            getCalls += 1
+            return record?.takeIf { it.id == id }
+        }
         override suspend fun upsert(record: SessionRecord) {
             this.record = record
             events += "persist:${record.status}"
@@ -360,7 +510,23 @@ class WearSessionControllerTest {
             events += "outbox:${record.id}"
         }
         override suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
-            this.record = record
+            checkpoint(record, samples)
+        }
+        override suspend fun checkpoint(record: SessionRecord, samples: List<HeartRateSample>) {
+            if (failNextCheckpoint) {
+                failNextCheckpoint = false
+                throw IllegalStateException("disk full")
+            }
+            val merged = ((this.record?.heartRateSamples ?: emptyList()) + samples)
+                .distinctBy(HeartRateSample::epochMillis)
+                .sortedBy(HeartRateSample::epochMillis)
+            this.record = record.copy(heartRateSamples = merged)
+            if (samples.isNotEmpty()) checkpointBatches += samples
+            events += "persist:${record.status}"
+        }
+        override suspend fun completeWithOutbox(record: SessionRecord, samples: List<HeartRateSample>, eventId: String, payload: String) {
+            checkpoint(record, samples)
+            events += "outbox:${record.id}"
         }
         fun latest(): SessionRecord? = record
         fun seed(record: SessionRecord) { this.record = record }
@@ -368,7 +534,8 @@ class WearSessionControllerTest {
 
     private class RecordingSnapshots : SessionSnapshotStore {
         var snapshot: WearSessionSnapshot? = null
-        override suspend fun save(snapshot: WearSessionSnapshot) { this.snapshot = snapshot }
+        var saveCount = 0
+        override suspend fun save(snapshot: WearSessionSnapshot) { this.snapshot = snapshot; saveCount += 1 }
         override suspend fun load(): WearSessionSnapshot? = snapshot
     }
 

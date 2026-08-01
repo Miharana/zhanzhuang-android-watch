@@ -21,6 +21,8 @@ data class WearSessionSnapshot(
     val pausedSinceBootMs: Long? = null,
     val intendedTerminalStatus: SessionStatus? = null,
     val heartRateAcceptFromBootMs: Long? = null,
+    /** At most one Room append batch; aggregate history deliberately lives only in Room. */
+    val pendingHeartRateSamples: List<HeartRateSample> = emptyList(),
 )
 
 enum class WearExternalOperation { START, PAUSE, RESUME, END }
@@ -59,8 +61,15 @@ class SharedPreferencesSessionSnapshotStore(
         put("endEpochMillis", record.endEpochMillis)
         put("activeDurationMs", record.activeDurationMs)
         put("pausedDurationMs", record.pausedDurationMs)
-        // Samples are batched to Room; snapshots intentionally never rewrite a growing HR history.
+        // Aggregate history belongs to Room. A snapshot carries only the retryable append tail.
         put("samples", JSONArray())
+        put("pendingHeartRateSamples", JSONArray(pendingHeartRateSamples.takeLast(MAX_PENDING_SAMPLES).map { sample ->
+            JSONObject().apply {
+                put("epochMillis", sample.epochMillis)
+                put("bpm", sample.bpm)
+                put("accuracy", sample.accuracy.name)
+            }
+        }))
     }
 
     private fun JSONObject.toSnapshot(): WearSessionSnapshot {
@@ -94,10 +103,18 @@ class SharedPreferencesSessionSnapshotStore(
             pausedSinceBootMs = getLongOrNull("pausedSinceBootMs"),
             intendedTerminalStatus = optString("intendedTerminalStatus").takeIf { it.isNotEmpty() }?.let(SessionStatus::valueOf),
             heartRateAcceptFromBootMs = getLongOrNull("heartRateAcceptFromBootMs"),
+            pendingHeartRateSamples = optJSONArray("pendingHeartRateSamples")?.let { array ->
+                List(array.length().coerceAtMost(MAX_PENDING_SAMPLES)) { index -> array.getJSONObject(index).let { value ->
+                    HeartRateSample(value.getLong("epochMillis"), value.getDouble("bpm"), SampleAccuracy.valueOf(value.getString("accuracy")))
+                } }
+            } ?: emptyList(),
         )
     }
 
     private fun JSONObject.getLongOrNull(name: String): Long? = if (isNull(name)) null else getLong(name)
 
-    private companion object { const val KEY = "wear_session_snapshot_v1" }
+    private companion object {
+        const val KEY = "wear_session_snapshot_v1"
+        const val MAX_PENDING_SAMPLES = 20
+    }
 }

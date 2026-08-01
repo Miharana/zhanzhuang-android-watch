@@ -80,10 +80,7 @@ interface WearSessionDao {
     @Update
     suspend fun updateSession(entity: WearSessionEntity): Int
 
-    @Query("DELETE FROM wear_heart_rate_samples WHERE sessionId = :sessionId")
-    suspend fun clearSamples(sessionId: String)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun saveSamples(samples: List<WearHeartRateEntity>)
 
     @Query("SELECT * FROM wear_sync_outbox ORDER BY nextAttemptEpochMs, eventId")
@@ -99,27 +96,17 @@ interface WearSessionDao {
     suspend fun deleteAcknowledged(eventId: String, acknowledgedRevision: Long)
 
     @Transaction
-    suspend fun saveSessionIfNewer(record: SessionRecord) {
+    suspend fun checkpoint(record: SessionRecord, samples: List<HeartRateSample>) {
         val existing = session(record.id)
-        if (existing != null && record.revision <= existing.revision) return
-
-        val updated = record.toWearEntity()
-        if (existing == null) {
-            insertSession(updated)
-        } else {
-            updateSession(updated)
+        when {
+            existing == null -> insertSession(record.toWearEntity())
+            record.revision < existing.revision -> return
+            record.revision > existing.revision -> updateSession(record.toWearEntity())
+            // Equal revisions intentionally retain metadata while allowing a crash-safe sample replay.
         }
-        clearSamples(record.id)
-        if (record.heartRateSamples.isNotEmpty()) {
-            saveSamples(record.heartRateSamples.map { it.toWearEntity(record.id) })
+        if (samples.isNotEmpty()) {
+            saveSamples(samples.map { it.toWearEntity(record.id) })
         }
-    }
-
-    @Transaction
-    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
-        val existing = session(record.id)
-        if (existing == null) insertSession(record.toWearEntity()) else if (record.revision > existing.revision) updateSession(record.toWearEntity())
-        if (samples.isNotEmpty()) saveSamples(samples.map { it.toWearEntity(record.id) })
     }
 
     @Transaction
@@ -134,8 +121,8 @@ interface WearSessionDao {
 
     /** Completion and its transferable event are one crash-atomic durable decision. */
     @Transaction
-    suspend fun saveCompletedWithOutbox(record: SessionRecord, entity: OutboxEntity) {
-        saveSessionIfNewer(record)
+    suspend fun saveCompletedWithOutbox(record: SessionRecord, samples: List<HeartRateSample>, entity: OutboxEntity) {
+        checkpoint(record, samples)
         enqueueIfCurrent(entity)
     }
 }
@@ -149,7 +136,7 @@ class WearSessionRepository(private val dao: WearSessionDao) {
 
     suspend fun upsert(record: SessionRecord) {
         require(record.owner == SessionOwner.WEAR) { "Wear can only persist Wear-owned sessions" }
-        dao.saveSessionIfNewer(record)
+        dao.checkpoint(record, record.heartRateSamples)
     }
 
     suspend fun enqueueCompleted(
@@ -170,17 +157,20 @@ class WearSessionRepository(private val dao: WearSessionDao) {
         )
     }
 
-    suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) {
+    suspend fun completeWithOutbox(record: SessionRecord, samples: List<HeartRateSample>, eventId: String, payload: String) {
         require(record.status == SessionStatus.COMPLETED) { "Only completed Wear sessions can enqueue completion" }
         dao.saveCompletedWithOutbox(
-            record,
+            record, samples,
             OutboxEntity(eventId = eventId, sessionId = record.id, revision = record.revision, payload = payload),
         )
     }
 
-    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) {
-        dao.appendHeartRateBatch(record, samples)
-    }
+    suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) =
+        completeWithOutbox(record, record.heartRateSamples, eventId, payload)
+
+    suspend fun checkpoint(record: SessionRecord, samples: List<HeartRateSample>) = dao.checkpoint(record, samples)
+
+    suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) = checkpoint(record, samples)
 
     suspend fun pendingOutbox(): List<OutboxEntity> = dao.pendingOutbox()
 

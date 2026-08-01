@@ -16,6 +16,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -120,6 +121,33 @@ class WearSessionRepositoryTest {
             samples.sortedBy(HeartRateSample::epochMillis),
             unsortedAggregateRepository.get("s1")!!.heartRateSamples,
         )
+    }
+
+    @Test
+    fun equalRevisionReplayAppendsOnlyTheDeltaWithoutReplacingMetadata() = runTest {
+        val initial = record(revision = 4, status = SessionStatus.RUNNING)
+        val first = HeartRateSample(1_001, 60.0, SampleAccuracy.HIGH)
+        val second = HeartRateSample(1_002, 61.0, SampleAccuracy.HIGH)
+
+        repository.checkpoint(initial, listOf(first))
+        repository.checkpoint(initial.copy(status = SessionStatus.PAUSED), listOf(second))
+
+        val stored = repository.get("s1")!!
+        assertEquals(SessionStatus.RUNNING, stored.status)
+        assertEquals(listOf(first, second), stored.heartRateSamples)
+    }
+
+    @Test
+    fun staleCheckpointCannotAppendSamplesOrReplaceMetadata() = runTest {
+        val durable = record(revision = 4, status = SessionStatus.RUNNING)
+        val stale = HeartRateSample(1_001, 60.0, SampleAccuracy.HIGH)
+
+        repository.checkpoint(durable, emptyList())
+        repository.checkpoint(record(revision = 3, status = SessionStatus.PAUSED), listOf(stale))
+
+        val stored = repository.get("s1")!!
+        assertEquals(SessionStatus.RUNNING, stored.status)
+        assertTrue(stored.heartRateSamples.isEmpty())
     }
 
     private fun record(

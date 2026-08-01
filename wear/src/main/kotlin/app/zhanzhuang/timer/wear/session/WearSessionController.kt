@@ -56,6 +56,8 @@ interface WearSessionRecordStore {
     suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String)
     suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String)
     suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>)
+    suspend fun checkpoint(record: SessionRecord, samples: List<HeartRateSample>)
+    suspend fun completeWithOutbox(record: SessionRecord, samples: List<HeartRateSample>, eventId: String, payload: String)
 }
 
 class WearSessionControllerImpl(
@@ -180,6 +182,17 @@ class WearSessionControllerImpl(
 
     /** Called by the service's single collector for Health Services callbacks. */
     suspend fun acceptHealthUpdate(update: WearHealthUpdate) = mutex.withLock {
+        try {
+            acceptHealthUpdateLocked(update)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // Keep the in-memory append tail. The next callback/checkpoint retries it.
+            publishState()
+        }
+    }
+
+    private suspend fun acceptHealthUpdateLocked(update: WearHealthUpdate) {
         when (update) {
             is WearHealthUpdate.AvailabilityChanged -> {
                 heartRateUnavailableReason = if (update.heartRateAvailable) null else DurationOnlyReason.HEART_RATE_UNAVAILABLE.name
@@ -187,6 +200,8 @@ class WearSessionControllerImpl(
             }
             is WearHealthUpdate.HeartRate -> {
                 val active = record?.takeIf { it.status == SessionStatus.RUNNING && healthExerciseOwned } ?: return
+                // A failed batch remains bounded. Retry it before considering a newer callback.
+                if (unflushedSamples.size >= SAMPLE_BATCH_COUNT) persistSampleDelta()
                 if (update.bpm !in MIN_HEART_RATE..MAX_HEART_RATE) return
                 val nowElapsed = clock.elapsedRealtimeMs()
                 val lowerBound = heartRateAcceptFromBootMs ?: nowElapsed
@@ -218,7 +233,15 @@ class WearSessionControllerImpl(
         val snapshot = snapshots.load() ?: return@withLock WearSessionRecovery.NO_SESSION
         // Snapshot omits growing HR history; merge Room's durable aggregate before any upsert.
         val durable = records.get(snapshot.record.id)
-        record = snapshot.record.copy(heartRateSamples = durable?.heartRateSamples ?: snapshot.record.heartRateSamples)
+        val sameSessionMemory = record?.takeIf { it.id == snapshot.record.id }
+        val sameSessionPending = if (sameSessionMemory != null) unflushedSamples.toList() else emptyList()
+        unflushedSamples.clear()
+        // Accept pre-protocol in-memory snapshots too; persisted snapshots serialize this field empty.
+        unflushedSamples += mergeSamples(sameSessionPending, snapshot.record.heartRateSamples, snapshot.pendingHeartRateSamples)
+        record = snapshot.record.copy(heartRateSamples = mergeSamples(
+            durable?.heartRateSamples.orEmpty(), sameSessionMemory?.heartRateSamples.orEmpty(),
+            snapshot.record.heartRateSamples, snapshot.pendingHeartRateSamples,
+        ))
         runningSinceBootMs = snapshot.runningSinceBootMs
         nextReminderAtActiveMs = snapshot.nextReminderAtActiveMs
         healthExerciseOwned = snapshot.healthExerciseOwned
@@ -322,27 +345,25 @@ class WearSessionControllerImpl(
     private fun intervalMs(): Long = record!!.config.intervalMinutes * MINUTE_MS
 
     private suspend fun persistSnapshotAndRecord(snapshotBootId: String = bootId()) {
+        mergeInMemoryHistory()
         record = record!!.copy(revision = record!!.revision + 1)
         saveSnapshotOnly(snapshotBootId)
-        records.upsert(record!!)
+        records.checkpoint(record!!, unflushedSamples.toList())
+        unflushedSamples.clear()
+        saveSnapshotOnly(snapshotBootId)
         lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
         samplesSinceStore = 0
         publishState()
     }
 
     private suspend fun persistSampleDelta() {
-        record = record!!.copy(revision = record!!.revision + 1)
-        records.appendHeartRateBatch(record!!, unflushedSamples.toList())
-        unflushedSamples.clear()
-        lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
-        samplesSinceStore = 0
-        publishState()
+        persistSnapshotAndRecord()
     }
 
     private suspend fun saveSnapshotOnly(snapshotBootId: String = bootId()) {
         snapshots.save(
             WearSessionSnapshot(
-                record = record!!,
+                record = record!!.copy(heartRateSamples = emptyList()),
                 bootId = snapshotBootId,
                 runningSinceBootMs = runningSinceBootMs,
                 nextReminderAtActiveMs = nextReminderAtActiveMs,
@@ -351,6 +372,7 @@ class WearSessionControllerImpl(
                 pausedSinceBootMs = pausedSinceBootMs,
                 intendedTerminalStatus = intendedTerminalStatus,
                 heartRateAcceptFromBootMs = heartRateAcceptFromBootMs,
+                pendingHeartRateSamples = unflushedSamples.takeLast(SAMPLE_BATCH_COUNT),
             ),
         )
     }
@@ -377,10 +399,13 @@ class WearSessionControllerImpl(
     }
 
     private suspend fun persistCompletedWithOutbox(snapshotBootId: String = bootId()) {
+        mergeInMemoryHistory()
         record = record!!.copy(revision = record!!.revision + 1)
         saveSnapshotOnly(snapshotBootId)
         val complete = record!!
-        records.completeWithOutbox(complete, "${complete.id}:${complete.revision}", complete.toOutboxPayload())
+        records.completeWithOutbox(complete, unflushedSamples.toList(), "${complete.id}:${complete.revision}", complete.toOutboxPayload())
+        unflushedSamples.clear()
+        saveSnapshotOnly(snapshotBootId)
         lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
         samplesSinceStore = 0
         publishState()
@@ -389,13 +414,23 @@ class WearSessionControllerImpl(
     private suspend fun repairTerminalDurability(snapshotBootId: String) {
         val terminal = record!!
         if (terminal.status == SessionStatus.COMPLETED) {
-            records.completeWithOutbox(terminal, "${terminal.id}:${terminal.revision}", terminal.toOutboxPayload())
+            records.completeWithOutbox(terminal, unflushedSamples.toList(), "${terminal.id}:${terminal.revision}", terminal.toOutboxPayload())
         } else {
-            records.upsert(terminal)
+            records.checkpoint(terminal, unflushedSamples.toList())
         }
+        unflushedSamples.clear()
         // Keep the exact snapshot revision; terminal recovery must never stale the outbox.
         saveSnapshotOnly(snapshotBootId)
     }
+
+    /** Steady checkpoints never reread Room: the controller already owns its in-process aggregate. */
+    private fun mergeInMemoryHistory() {
+        val current = record ?: return
+        record = current.copy(heartRateSamples = mergeSamples(current.heartRateSamples, unflushedSamples))
+    }
+
+    private fun mergeSamples(vararg inputs: List<HeartRateSample>): List<HeartRateSample> =
+        inputs.asSequence().flatten().distinctBy(HeartRateSample::epochMillis).sortedBy(HeartRateSample::epochMillis).toList()
 
     private companion object {
         const val MINUTE_MS = 60_000L
@@ -418,7 +453,11 @@ class RepositoryRecordStore(
     override suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String) =
         repository.enqueueCompleted(eventId, sessionId, revision, payload)
     override suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) =
-        repository.completeWithOutbox(record, eventId, payload)
+        repository.completeWithOutbox(record, emptyList(), eventId, payload)
     override suspend fun appendHeartRateBatch(record: SessionRecord, samples: List<HeartRateSample>) =
         repository.appendHeartRateBatch(record, samples)
+    override suspend fun checkpoint(record: SessionRecord, samples: List<HeartRateSample>) =
+        repository.checkpoint(record, samples)
+    override suspend fun completeWithOutbox(record: SessionRecord, samples: List<HeartRateSample>, eventId: String, payload: String) =
+        repository.completeWithOutbox(record, samples, eventId, payload)
 }
