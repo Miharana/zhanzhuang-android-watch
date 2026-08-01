@@ -91,6 +91,7 @@ class MobileSessionControllerTest {
 
         assertEquals(SyncState.LOCAL_ONLY, shortController.state.value.session!!.healthConnectState)
         assertTrue(scheduler.statuses.isEmpty())
+        assertEquals(1, haptics.completionCount)
     }
 
     @Test

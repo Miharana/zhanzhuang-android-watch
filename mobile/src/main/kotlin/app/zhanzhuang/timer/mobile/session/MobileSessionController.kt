@@ -227,8 +227,8 @@ class DefaultMobileSessionController(
                 repository.upsert(localResult)
                 mutableState.value = uiState(localResult, currentSnapshot)
             }
-            haptics.completion()
         }
+        if (!cancelled) haptics.completion()
     }
 
     private suspend fun persist(updated: SessionRecord, snapshot: ClockSnapshot) {
