@@ -6,6 +6,8 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.model.SyncState
+import android.os.RemoteException
+import androidx.health.connect.client.records.metadata.Metadata
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,6 +33,18 @@ class HealthSyncWorkerTest {
 
         assertIs<HealthSyncOutcome.Synced>(outcome)
         assertEquals(listOf(WriteKind.EXERCISE), gateway.writes)
+    }
+
+    @Test
+    fun productionRecordMappingPrefersMindfulnessAndFallsBackToExercise() {
+        assertEquals(
+            HealthSessionRecordKind.MINDFULNESS,
+            AndroidHealthConnectGateway.sessionRecordKind(HealthAvailability.AVAILABLE),
+        )
+        assertEquals(
+            HealthSessionRecordKind.EXERCISE,
+            AndroidHealthConnectGateway.sessionRecordKind(HealthAvailability.MINDFULNESS_UNSUPPORTED),
+        )
     }
 
     @Test
@@ -93,6 +107,35 @@ class HealthSyncWorkerTest {
                 HealthSyncOutcome.Synced(sessionWritten = true, heartRateWritten = false),
             ),
         )
+    }
+
+    @Test
+    fun remoteHealthConnectFailureIsRetryable() {
+        assertIs<HealthWriteResult.Retryable>(
+            AndroidHealthConnectGateway.writeFailure(RemoteException("binder disconnected")),
+        )
+    }
+
+    @Test
+    fun userStartedSessionsUseActivelyRecordedMetadata() {
+        val metadata = AndroidHealthConnectGateway.sessionMetadata(completed())
+
+        assertEquals(Metadata.RECORDING_METHOD_ACTIVELY_RECORDED, metadata.recordingMethod)
+        assertEquals("zz:session-1:session", metadata.clientRecordId)
+        assertEquals(7, metadata.clientRecordVersion)
+    }
+
+    @Test
+    fun workerOutcomeAdvancesThePendingRevision() {
+        val pending = completed().copy(revision = 8, healthConnectState = SyncState.PENDING)
+
+        val updated = HealthSyncWorker.recordAfterOutcome(
+            pending,
+            HealthSyncOutcome.Synced(sessionWritten = true, heartRateWritten = false),
+        )
+
+        assertEquals(9, updated?.revision)
+        assertEquals(SyncState.SYNCED, updated?.healthConnectState)
     }
 
     @Test

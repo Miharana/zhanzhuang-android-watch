@@ -146,7 +146,11 @@ open class MobileSessionService : Service() {
                 wallClock = WallClock { System.currentTimeMillis() },
                 haptics = AndroidMobileHaptics(context.getSystemService(Vibrator::class.java)),
                 healthSyncScheduler = HealthSyncScheduler { record ->
-                    HealthSyncWorker.enqueue(context, record)
+                    if (HealthSyncWorker.enqueue(context, record)) {
+                        HealthSyncEnqueueResult.Enqueued
+                    } else {
+                        HealthSyncEnqueueResult.NotEligible
+                    }
                 },
             )
         },

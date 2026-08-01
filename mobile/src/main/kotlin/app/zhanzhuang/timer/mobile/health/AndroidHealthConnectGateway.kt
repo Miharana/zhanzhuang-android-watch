@@ -1,6 +1,7 @@
 package app.zhanzhuang.timer.mobile.health
 
 import android.content.Context
+import android.os.RemoteException
 import app.zhanzhuang.timer.model.HeartRateSample
 import app.zhanzhuang.timer.model.SampleAccuracy
 import app.zhanzhuang.timer.model.SessionRecord
@@ -12,10 +13,12 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.MindfulnessSessionRecord
 import androidx.health.connect.client.records.Record
-import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.records.metadata.Device
+import androidx.health.connect.client.records.metadata.Metadata
 import java.io.IOException
 import java.time.Instant
+
+enum class HealthSessionRecordKind { MINDFULNESS, EXERCISE }
 
 @OptIn(ExperimentalMindfulnessSessionApi::class)
 class AndroidHealthConnectGateway(
@@ -104,8 +107,8 @@ class AndroidHealthConnectGateway(
         startTime: Instant,
         endTime: Instant,
         availability: HealthAvailability,
-    ): Record = when (availability) {
-        HealthAvailability.AVAILABLE -> MindfulnessSessionRecord(
+    ): Record = when (sessionRecordKind(availability)) {
+        HealthSessionRecordKind.MINDFULNESS -> MindfulnessSessionRecord(
             startTime = startTime,
             startZoneOffset = null,
             endTime = endTime,
@@ -115,7 +118,7 @@ class AndroidHealthConnectGateway(
             title = SESSION_TITLE,
             notes = null,
         )
-        HealthAvailability.MINDFULNESS_UNSUPPORTED -> ExerciseSessionRecord(
+        HealthSessionRecordKind.EXERCISE -> ExerciseSessionRecord(
             startTime = startTime,
             startZoneOffset = null,
             endTime = endTime,
@@ -125,7 +128,6 @@ class AndroidHealthConnectGateway(
             notes = null,
             metadata = metadata(sessionClientRecordId(record), record),
         )
-        HealthAvailability.UNAVAILABLE -> error("Availability checked before building record")
     }
 
     private fun heartRateRecord(
@@ -148,15 +150,7 @@ class AndroidHealthConnectGateway(
     )
 
     private fun metadata(clientRecordId: String, record: SessionRecord): Metadata =
-        Metadata.autoRecorded(
-            Device(
-                type = Device.TYPE_PHONE,
-                manufacturer = android.os.Build.MANUFACTURER,
-                model = android.os.Build.MODEL,
-            ),
-            clientRecordId,
-            clientRecordVersion(record),
-        )
+        recordedMetadata(clientRecordId, record)
 
     private fun sessionWritePermission(availability: HealthAvailability): String = when (availability) {
         HealthAvailability.AVAILABLE -> HealthPermission.getWritePermission(MindfulnessSessionRecord::class)
@@ -164,11 +158,7 @@ class AndroidHealthConnectGateway(
         HealthAvailability.UNAVAILABLE -> error("Availability checked before requesting permissions")
     }
 
-    private fun Exception.toWriteFailure(): HealthWriteResult = when (this) {
-        is IOException -> HealthWriteResult.Retryable(message ?: "Health Connect I/O failure")
-        is SecurityException -> HealthWriteResult.PermissionMissing(emptySet())
-        else -> HealthWriteResult.PermanentFailure(message ?: javaClass.simpleName)
-    }
+    private fun Exception.toWriteFailure(): HealthWriteResult = writeFailure(this)
 
     companion object {
         private const val SESSION_TITLE = "站桩 / Zhan Zhuang"
@@ -185,6 +175,23 @@ class AndroidHealthConnectGateway(
 
         fun clientRecordVersion(record: SessionRecord): Long = record.revision
 
+        fun sessionRecordKind(availability: HealthAvailability): HealthSessionRecordKind = when (availability) {
+            HealthAvailability.AVAILABLE -> HealthSessionRecordKind.MINDFULNESS
+            HealthAvailability.MINDFULNESS_UNSUPPORTED -> HealthSessionRecordKind.EXERCISE
+            HealthAvailability.UNAVAILABLE -> error("Unavailable Health Connect cannot create a record")
+        }
+
+        fun sessionMetadata(record: SessionRecord): Metadata =
+            recordedMetadata(sessionClientRecordId(record), record)
+
+        fun writeFailure(error: Exception): HealthWriteResult = when (error) {
+            is IOException,
+            is RemoteException,
+            -> HealthWriteResult.Retryable(error.message ?: "Health Connect transport failure")
+            is SecurityException -> HealthWriteResult.PermissionMissing(emptySet())
+            else -> HealthWriteResult.PermanentFailure(error.message ?: error.javaClass.simpleName)
+        }
+
         fun exportableHeartRateSamples(record: SessionRecord): List<HeartRateSample> {
             val start = record.startEpochMillis ?: return emptyList()
             val end = record.endEpochMillis ?: return emptyList()
@@ -194,5 +201,16 @@ class AndroidHealthConnectGateway(
                     sample.accuracy in setOf(SampleAccuracy.MEDIUM, SampleAccuracy.HIGH)
             }
         }
+
+        private fun recordedMetadata(clientRecordId: String, record: SessionRecord): Metadata =
+            Metadata.activelyRecorded(
+                Device(
+                    type = Device.TYPE_PHONE,
+                    manufacturer = "",
+                    model = "",
+                ),
+                clientRecordId,
+                clientRecordVersion(record),
+            )
     }
 }

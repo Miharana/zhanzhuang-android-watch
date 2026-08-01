@@ -27,7 +27,13 @@ interface MobileHaptics {
 }
 
 fun interface HealthSyncScheduler {
-    fun enqueue(record: SessionRecord): Boolean
+    fun enqueue(record: SessionRecord): HealthSyncEnqueueResult
+}
+
+sealed interface HealthSyncEnqueueResult {
+    data object Enqueued : HealthSyncEnqueueResult
+    data object NotEligible : HealthSyncEnqueueResult
+    data object Failed : HealthSyncEnqueueResult
 }
 
 data class MobileSessionUiState(
@@ -51,7 +57,7 @@ class DefaultMobileSessionController(
     private val elapsedClock: ElapsedClock,
     private val wallClock: WallClock,
     private val haptics: MobileHaptics,
-    private val healthSyncScheduler: HealthSyncScheduler = HealthSyncScheduler { false },
+    private val healthSyncScheduler: HealthSyncScheduler = HealthSyncScheduler { HealthSyncEnqueueResult.NotEligible },
 ) : MobileSessionController {
     private val mutex = Mutex()
     private val mutableState = MutableStateFlow(MobileSessionUiState())
@@ -199,15 +205,27 @@ class DefaultMobileSessionController(
         repository.upsert(finished)
         mutableState.value = uiState(finished, currentSnapshot)
         if (!cancelled) {
-            val queued = runCatching { healthSyncScheduler.enqueue(finished) }.getOrDefault(false)
-            if (queued) {
-                val pendingExport = finished.copy(
-                    revision = finished.revision + 1,
-                    healthConnectState = app.zhanzhuang.timer.model.SyncState.PENDING,
+            val pendingExport = finished.copy(
+                revision = finished.revision + 1,
+                healthConnectState = app.zhanzhuang.timer.model.SyncState.PENDING,
+            )
+            record = pendingExport
+            repository.upsert(pendingExport)
+            mutableState.value = uiState(pendingExport, currentSnapshot)
+            val enqueueResult = runCatching { healthSyncScheduler.enqueue(pendingExport) }
+                .getOrDefault(HealthSyncEnqueueResult.Failed)
+            if (enqueueResult != HealthSyncEnqueueResult.Enqueued) {
+                val localResult = pendingExport.copy(
+                    revision = pendingExport.revision + 1,
+                    healthConnectState = if (enqueueResult == HealthSyncEnqueueResult.NotEligible) {
+                        app.zhanzhuang.timer.model.SyncState.LOCAL_ONLY
+                    } else {
+                        app.zhanzhuang.timer.model.SyncState.FAILED
+                    },
                 )
-                record = pendingExport
-                repository.upsert(pendingExport)
-                mutableState.value = uiState(pendingExport, currentSnapshot)
+                record = localResult
+                repository.upsert(localResult)
+                mutableState.value = uiState(localResult, currentSnapshot)
             }
             haptics.completion()
         }

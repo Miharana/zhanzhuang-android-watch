@@ -78,6 +78,13 @@ class HealthSyncWorker(
             is HealthSyncOutcome.Skipped -> null
         }
 
+        fun recordAfterOutcome(
+            record: SessionRecord,
+            outcome: HealthSyncOutcome,
+        ): SessionRecord? = nextHealthConnectState(record, outcome)
+            ?.takeIf { it != record.healthConnectState }
+            ?.let { state -> record.copy(revision = record.revision + 1, healthConnectState = state) }
+
         fun enqueue(context: Context, record: SessionRecord): Boolean {
             if (record.status != SessionStatus.COMPLETED || record.activeDurationMs < MIN_EXPORT_DURATION_MILLIS) {
                 return false
@@ -106,10 +113,8 @@ class HealthConnectExportWorker(
         val repository = repositoryFactory(applicationContext)
         val record = repository.get(sessionId) ?: return Result.success()
         val outcome = HealthSyncWorker(HealthSyncWorkerDependencies.gateway(applicationContext)).sync(record)
-        HealthSyncWorker.nextHealthConnectState(record, outcome)?.let { state ->
-            if (state != record.healthConnectState) {
-                repository.upsert(record.copy(revision = record.revision + 1, healthConnectState = state))
-            }
+        HealthSyncWorker.recordAfterOutcome(record, outcome)?.let { updated ->
+            repository.upsert(updated)
         }
         return when (outcome) {
             HealthSyncOutcome.Retry -> Result.retry()

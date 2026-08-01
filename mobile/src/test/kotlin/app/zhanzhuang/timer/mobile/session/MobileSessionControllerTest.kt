@@ -54,6 +54,30 @@ class MobileSessionControllerTest {
     }
 
     @Test
+    fun completionPersistsPendingBeforeSchedulerCanObserveTheRecord() = runTest {
+        val repository = InMemorySessionRepository()
+        var observed: SessionRecord? = null
+        val scheduler = HealthSyncScheduler { record ->
+            observed = repository.activeOrLast()
+            HealthSyncEnqueueResult.Enqueued
+        }
+        val exportingController = DefaultMobileSessionController(
+            repository = repository,
+            elapsedClock = elapsed,
+            wallClock = wall,
+            haptics = haptics,
+            healthSyncScheduler = scheduler,
+        )
+        exportingController.start(SessionConfig(15, 5))
+        elapsed.advanceBy(900_000)
+
+        exportingController.tick()
+
+        assertEquals(SyncState.PENDING, observed?.healthConnectState)
+        assertEquals(3, observed?.revision)
+    }
+
+    @Test
     fun healthSyncEnqueueFailureDoesNotBlockLocalCompletion() = runTest {
         val failingScheduler = HealthSyncScheduler { error("WorkManager unavailable") }
         val exportingController = DefaultMobileSessionController(
@@ -69,6 +93,7 @@ class MobileSessionControllerTest {
         exportingController.tick()
 
         assertEquals(SessionStatus.COMPLETED, exportingController.state.value.session!!.status)
+        assertEquals(SyncState.FAILED, exportingController.state.value.session!!.healthConnectState)
         assertEquals(1, haptics.completionCount)
     }
 
@@ -169,9 +194,9 @@ class MobileSessionControllerTest {
     private class RecordingHealthSyncScheduler : HealthSyncScheduler {
         val statuses = mutableListOf<String>()
 
-        override fun enqueue(record: SessionRecord): Boolean {
+        override fun enqueue(record: SessionRecord): HealthSyncEnqueueResult {
             statuses += record.status.name
-            return true
+            return HealthSyncEnqueueResult.Enqueued
         }
     }
 
