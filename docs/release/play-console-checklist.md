@@ -10,6 +10,11 @@ Release identity:
 
 ## Before any upload
 
+- [ ] Register the Play developer account as an **organisation**, not a personal
+  account. Google says organisation accounts should be used for health apps;
+  organisation verification requires a D-U-N-S number and matching legal and
+  payments-profile information. Official guidance:
+  <https://support.google.com/googleplay/android-developer/answer/13634885?hl=en-GB>.
 - [ ] Confirm the package is available or the correct Play app record is registered under the verified developer account.
 - [ ] Enroll in Play App Signing and record the Play signing certificate separately from the local upload-certificate fingerprint.
 - [ ] Confirm the external upload key path and certificate, then run `scripts/verify_release.sh` with credentials only in the verification shell.
@@ -66,3 +71,8 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
   but the target returns HTTP 404; both user tokens return 403 for both
   packages. The live Console remains at the account-type step of developer
   account signup, with no form submission or billing/account mutation.
+- [x] The account-type decision is resolved: use an organisation account because
+  this app tracks/exports wellness and heart-rate information and therefore
+  falls within Google Play's Health apps scope. The owner still has to supply
+  and verify the organisation's D-U-N-S, legal, contact, identity, and payments
+  information.

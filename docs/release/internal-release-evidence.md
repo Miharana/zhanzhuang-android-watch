@@ -69,11 +69,14 @@ therefore be unsafe and was not done.
 
 ## External blocker and exact continuation
 
-An account owner must complete the Google Play developer-account bootstrap
-(including any identity, terms, and payment steps the Console requires), then
-grant a repository-external service account app access or provide an
-appropriately authorized external credential. Once an authenticated developer
-dashboard is available, the continuation is:
+An account owner must complete the Google Play developer-account bootstrap as
+an **organisation account** (including D-U-N-S, matching legal/contact details,
+identity, terms, and payment steps), then grant a repository-external service
+account app access or provide an appropriately authorized external credential.
+Google's current account-type guidance says organisation accounts should be
+used for health apps and that D-U-N-S verification is mandatory:
+<https://support.google.com/googleplay/android-developer/answer/13634885?hl=en-GB>.
+Once an authenticated developer dashboard is available, the continuation is:
 
 1. Create or confirm the `app.zhanzhuang.timer` record; enroll Play App
    Signing; complete truthful Health apps, Data safety, content rating, public
@@ -140,6 +143,10 @@ credential without opening a Publisher edit:
   terms, and payment setup. No choice was clicked, no form was filled, and no
   account or billing mutation was made. The live tab was left open as a handoff
   for the account owner.
+- The optimal account-type choice is now resolved from current official Play
+  guidance: use an organisation account because this timer handles wellness and
+  heart-rate information and is a Health app. This decision does not eliminate
+  the owner-only D-U-N-S, legal identity, terms, and payment verification steps.
 
 Unlike the earlier track checks, these continuation probes created no Android
 Publisher edit and performed no remote write. Until the owner completes the
