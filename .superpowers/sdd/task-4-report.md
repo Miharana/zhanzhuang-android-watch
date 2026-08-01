@@ -87,7 +87,7 @@ Result: no matches. The merged manifest has the required watch feature, standalo
 - Health Services config is explicitly `ExerciseType.MEDITATION`, requests only `HEART_RATE_BPM`, and disables GPS and auto-pause.
 - `OTHER_APP_IN_PROGRESS`, unsupported heart rate, unavailable Health Services, and permission denial return an explicit duration-only result. No start call is made over another app’s exercise.
 - `pause`, `resume`, and `end` are no-ops unless this adapter has successfully obtained an app-owned exercise; cancellation is always rethrown.
-- The outbox requires an exactly matching persisted revision, refuses stale replacements, retains payloads until matching-or-newer ACK, and records retry metadata for Task 6.
+- The outbox requires an exactly matching persisted revision, refuses stale replacements, retains payloads until an exactly matching ACK, and records retry metadata for Task 6.
 - Haptic patterns are fixed and use Android’s `-1` repeat index, so alerts never replay.
 
 ## Risks / deliberate boundaries
@@ -277,3 +277,36 @@ Result: no forbidden manifest matches.
 - `19d2246 fix: retain Wear ownership through capability lookup`
 
 Independent review was run after the implementation and each corrective pass. The final review approved spec compliance and code quality with no remaining Critical, Important, or Minor findings.
+
+---
+
+## Exact ACK revision follow-up
+
+### RED
+
+`acknowledgmentOnlyRemovesExactlyMatchingRevision` was extended before changing the DAO to acknowledge the revision-2 event with revision 3 and assert that the outbox still contains the event.
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew :wear:testDebugUnitTest --tests 'app.zhanzhuang.timer.wear.data.WearSessionRepositoryTest'
+```
+
+Result: failed as expected at the higher-revision ACK assertion. The prior `revision <= :acknowledgedRevision` predicate incorrectly deleted revision 2 for ACK revision 3.
+
+### GREEN
+
+The outbox delete predicate is now `revision = :acknowledgedRevision`. The focused test proves lower and higher ACKs retain the revision-2 event, while the equal ACK removes it.
+
+### Tests
+
+- Focused `WearSessionRepositoryTest`: `BUILD SUCCESSFUL`.
+- `:wear:testDebugUnitTest :wear:lintDebug`: `BUILD SUCCESSFUL`.
+- `./gradlew test`: `BUILD SUCCESSFUL`.
+- Merged Wear debug manifest scan for `location`, GPS, and coarse/fine location: no matches.
+
+### Self-review
+
+- The change is limited to exact event/revision ACK matching; it does not add Data Layer transport, retry processing, or UI/service scope.
+- A future transport ACK carrying a later revision can no longer erase a durable earlier-revision event.
+- Commit: `ac92e89 fix: require exact Wear outbox ACK revision`.
