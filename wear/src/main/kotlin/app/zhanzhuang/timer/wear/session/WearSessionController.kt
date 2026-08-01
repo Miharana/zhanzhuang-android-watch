@@ -254,10 +254,11 @@ class WearSessionControllerImpl(
         }
         when (pendingOperation) {
             WearExternalOperation.PAUSE -> {
+                val alreadyPaused = record!!.status == SessionStatus.PAUSED
                 if (healthExerciseOwned) health.pause()
                 record = record!!.copy(status = SessionStatus.PAUSED, activeDurationMs = activeDurationNow())
                 runningSinceBootMs = null
-                pausedSinceBootMs = clock.elapsedRealtimeMs()
+                if (!alreadyPaused || pausedSinceBootMs == null) pausedSinceBootMs = clock.elapsedRealtimeMs()
                 pendingOperation = null
                 persistSnapshotAndRecord(currentBootId)
             }

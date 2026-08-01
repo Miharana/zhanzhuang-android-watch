@@ -1,6 +1,7 @@
 package app.zhanzhuang.timer.wear.session
 
 import android.app.PendingIntent
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -17,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -52,14 +54,29 @@ class WearSessionService : Service() {
         commands = WearSessionCommandProcessor(controller)
         serviceScope.launch {
             controller.state.collect { state ->
-                startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(state, statusIntent()))
+                if (state.record?.status in ACTIVE_STATUSES) {
+                    // Never promote null/terminal states back to foreground from this asynchronous observer.
+                    getSystemService(NotificationManager::class.java).notify(
+                        OngoingSessionNotification.NOTIFICATION_ID,
+                        notification.build(state, statusIntent()),
+                    )
+                }
             }
         }
         serviceScope.launch {
             health.updates.collect { update -> controller.acceptHealthUpdate(update) }
         }
         serviceScope.launch {
-            for (request in requests) processRequest(request)
+            for (request in requests) {
+                try {
+                    processRequest(request)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    // The controller has already durably recorded its pending external operation.
+                    // Keep this actor alive so STATUS (or the next explicit action) can retry recovery.
+                }
+            }
         }
     }
 
@@ -152,6 +169,12 @@ class WearSessionService : Service() {
             app.zhanzhuang.timer.model.SessionStatus.COMPLETED,
             app.zhanzhuang.timer.model.SessionStatus.CANCELLED,
             app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED,
+        )
+        private val ACTIVE_STATUSES = setOf(
+            app.zhanzhuang.timer.model.SessionStatus.STARTING,
+            app.zhanzhuang.timer.model.SessionStatus.RUNNING,
+            app.zhanzhuang.timer.model.SessionStatus.PAUSED,
+            app.zhanzhuang.timer.model.SessionStatus.COMPLETING,
         )
 
         /** This factory is the explicit-user-action entry point; callers use ContextCompat.startForegroundService. */

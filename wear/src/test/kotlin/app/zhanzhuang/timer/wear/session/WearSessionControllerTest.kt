@@ -227,6 +227,25 @@ class WearSessionControllerTest {
     }
 
     @Test
+    fun pausedRecoveryPreservesOriginalPauseAnchorUntilResume() = runTest {
+        val clock = AdjustableClock().also { it.advanceBy(1_000) }
+        val store = RecordingStore()
+        val controller = WearSessionControllerImpl(
+            store,
+            RecordingSnapshots().also {
+                it.save(WearSessionSnapshot(record(SessionStatus.PAUSED), "boot", pausedSinceBootMs = 500, healthExerciseOwned = true))
+            },
+            RecordingHealth(), clock, RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+        clock.advanceBy(500)
+        controller.resume()
+
+        assertEquals(1_000, store.latest()!!.pausedDurationMs)
+    }
+
+    @Test
     fun heartRateUsesEventMonotonicTimestampAndOnlyRunningOwnedSession() = runTest {
         val clock = AdjustableClock().also { it.advanceBy(500) }
         val controller = WearSessionControllerImpl(
