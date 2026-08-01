@@ -128,6 +128,91 @@ class WearHealthClientTest {
 
     @Suppress("RestrictedApi")
     @Test
+    fun ownedExerciseCapabilityPermissionFailureRetainsOwnershipForRecovery() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                capabilitiesFailure = SecurityException("capability lookup denied"),
+            ),
+        )
+
+        assertEquals(
+            WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.PERMISSION_DENIED),
+            client.start(),
+        )
+        client.end()
+
+        assertEquals(0, calls.count { it == "startExerciseAsync" })
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
+    fun ownedExerciseCapabilityHealthServicesFailureRetainsOwnershipForRecovery() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                capabilitiesFailure = HealthServicesException("capability lookup unavailable"),
+            ),
+        )
+
+        assertEquals(
+            WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE),
+            client.start(),
+        )
+        client.end()
+
+        assertEquals(0, calls.count { it == "startExerciseAsync" })
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
+    fun ownedExerciseWithoutHeartRateRetainsOwnershipForRecovery() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                heartRateAvailable = false,
+            ),
+        )
+
+        assertEquals(
+            WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.HEART_RATE_UNAVAILABLE),
+            client.start(),
+        )
+        client.end()
+
+        assertEquals(0, calls.count { it == "startExerciseAsync" })
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
+    fun ownedExerciseCapabilityCancellationIsRethrownAndRetainsOwnershipForRecovery() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                capabilitiesFailure = CancellationException("capability lookup cancelled"),
+            ),
+        )
+
+        assertFailsWith<CancellationException> { client.start() }
+        client.end()
+
+        assertEquals(0, calls.count { it == "startExerciseAsync" })
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
     fun callbackRegistrationCancellationIsRethrownAndLeavesOurExerciseRecoverable() = kotlinx.coroutines.test.runTest {
         val calls = mutableListOf<String>()
         val client = AndroidWearHealthClient(
@@ -150,6 +235,8 @@ class WearHealthClientTest {
         status: Int,
         calls: MutableList<String>,
         callbackFailure: Throwable? = null,
+        capabilitiesFailure: Throwable? = null,
+        heartRateAvailable: Boolean = true,
         failures: FakeExerciseFailures = FakeExerciseFailures(),
     ): ExerciseClient = Proxy.newProxyInstance(
         ExerciseClient::class.java.classLoader,
@@ -158,18 +245,19 @@ class WearHealthClientTest {
         calls += method.name
         when (method.name) {
             "getCurrentExerciseInfoAsync" -> Futures.immediateFuture(ExerciseInfo(status, ExerciseType.MEDITATION))
-            "getCapabilitiesAsync" -> Futures.immediateFuture(
-                ExerciseCapabilities(
-                    mapOf(
-                        ExerciseType.MEDITATION to ExerciseTypeCapabilities(
-                            supportedDataTypes = setOf(DataType.HEART_RATE_BPM),
-                            supportedGoals = emptyMap(),
-                            supportedMilestones = emptyMap(),
-                            supportsAutoPauseAndResume = false,
+            "getCapabilitiesAsync" -> capabilitiesFailure?.let { Futures.immediateFailedFuture(it) }
+                ?: Futures.immediateFuture(
+                    ExerciseCapabilities(
+                        mapOf(
+                            ExerciseType.MEDITATION to ExerciseTypeCapabilities(
+                                supportedDataTypes = if (heartRateAvailable) setOf(DataType.HEART_RATE_BPM) else emptySet(),
+                                supportedGoals = emptyMap(),
+                                supportedMilestones = emptyMap(),
+                                supportsAutoPauseAndResume = false,
+                            ),
                         ),
                     ),
-                ),
-            )
+                )
             "setUpdateCallback" -> callbackFailure?.let { throw it }
             "endExerciseAsync" -> if (failures.remainingEndFailures-- > 0) {
                 Futures.immediateFailedFuture(HealthServicesException("cleanup failed"))

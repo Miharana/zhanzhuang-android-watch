@@ -205,3 +205,67 @@ if rg -n -i 'location|access_(fine|coarse)_location|gps|internet' "$MANIFEST_PAT
 ```
 
 Result: no forbidden manifest matches.
+
+---
+
+## Capability lookup ownership follow-up
+
+### RED
+
+Added focused `OWNED_EXERCISE_IN_PROGRESS` regressions before changing production code:
+
+- `SecurityException` during `getCapabilities()` returns recoverable ownership and `end()` can finish the reported app-owned exercise.
+- `HealthServicesException` during `getCapabilities()` has the same recoverable behavior.
+- Unsupported heart rate returns `StartedWithoutUpdates(HEART_RATE_UNAVAILABLE)`, rather than the dishonest `DurationOnly` state, and leaves `end()` available.
+- `CancellationException` during `getCapabilities()` is rethrown while retaining ownership for a later `end()`.
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.ownedExerciseCapabilityPermissionFailureRetainsOwnershipForRecovery' \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.ownedExerciseCapabilityHealthServicesFailureRetainsOwnershipForRecovery' \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.ownedExerciseWithoutHeartRateRetainsOwnershipForRecovery' \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.ownedExerciseCapabilityCancellationIsRethrownAndRetainsOwnershipForRecovery'
+```
+
+Result: failed as expected (four `AssertionError`s). Before the fix, ownership was recorded only after `getCapabilities()` and successful capability selection, so every regression left `end()` as a no-op or reported the non-recoverable `DurationOnly` state.
+
+### GREEN
+
+The adapter now records an observed `OWNED_EXERCISE_IN_PROGRESS` before querying capabilities. Any capability-driven duration-only result for that known app-owned exercise is converted to `StartedWithoutUpdates` with the original reason. Existing no-exercise and third-party-exercise fallbacks remain duration-only; only an app-owned exercise enables lifecycle recovery.
+
+The focused four-test command then passed (`BUILD SUCCESSFUL`).
+
+### Final verification
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest'
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest :wear:lintDebug
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain test
+```
+
+Result: all commands were `BUILD SUCCESSFUL`.
+
+```sh
+MANIFEST_PATH=wear/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+if rg -n -i 'location|access_(fine|coarse)_location|gps|internet' "$MANIFEST_PATH"; then exit 1; else echo 'no matches'; fi
+```
+
+Result: no forbidden manifest matches.
+
+### Self-review
+
+- An existing third-party exercise never sets `ownsExercise`, so this change cannot end it; the existing duration-only/no-takeover branch is unchanged.
+- An app-owned existing exercise becomes recoverable immediately after status observation. This covers permission and Health Services failures plus cancellation before callback registration.
+- `StartedWithoutUpdates` honestly signals that an app-owned exercise remains active without usable heart-rate updates; callers can call `end()` to recover it.
+- A fresh no-exercise path still owns an exercise only after `startExercise()` succeeds. Unsupported heart rate or capability failure before that remains `DurationOnly`.

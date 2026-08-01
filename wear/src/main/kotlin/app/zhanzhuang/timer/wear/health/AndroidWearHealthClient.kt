@@ -60,16 +60,23 @@ class AndroidWearHealthClient(
         try {
             val info = exerciseClient.getCurrentExerciseInfo()
             val existingExercise = info.toExistingExercise()
+            if (existingExercise == ExistingExercise.OWNED) {
+                ownsExercise = true
+            }
             val capabilities = exerciseClient.getCapabilities()
             val result = startResultFor(existingExercise, capabilities.supportsHeartRate())
-            if (result !is WearHealthStartResult.Started) return result
+            if (result is WearHealthStartResult.DurationOnly) {
+                return if (ownsExercise) {
+                    WearHealthStartResult.StartedWithoutUpdates(result.reason)
+                } else {
+                    result
+                }
+            }
 
             if (existingExercise == ExistingExercise.NONE) {
                 exerciseClient.startExercise(createExerciseConfig())
                 ownsExercise = true
                 startedExerciseInThisCall = true
-            } else if (existingExercise == ExistingExercise.OWNED) {
-                ownsExercise = true
             }
             exerciseClient.setUpdateCallback(callback)
             ownsExercise = true
