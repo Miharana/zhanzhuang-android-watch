@@ -33,6 +33,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.health.services.client)
     implementation(libs.androidx.wear.ongoing)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.play.services.wearable)
     implementation(libs.kotlinx.coroutines.play.services)
     ksp(libs.androidx.room.compiler)

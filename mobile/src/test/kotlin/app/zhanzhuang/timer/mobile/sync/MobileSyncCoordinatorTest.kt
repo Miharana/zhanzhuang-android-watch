@@ -85,6 +85,27 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun replayedCompletionAfterLostAckIsAcknowledgedWhenLocalHealthStateChanged() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also {
+            it.mergeRemote(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED, healthConnectState = app.zhanzhuang.timer.model.SyncState.PENDING))
+        }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 10_000L })
+
+        assertTrue(coordinator.receiveCompleted(envelope("completion-retry", 4, SyncPayload.Completed(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED)))) )
+        assertEquals("ACK", transport.sentPayloadNames.single())
+    }
+
+    @Test
+    fun wrongSessionPauseCannotOperateCurrentSession() = runTest {
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(FakeTransport(), controller, this, nowEpochMillis = { 10_000L })
+
+        assertFalse(coordinator.receiveCommand(SyncEnvelope(eventId = "wrong-pause", sessionId = "other", revision = 1, sentAtEpochMillis = 1, payload = SyncPayload.Pause)))
+        assertEquals(SessionStatus.RUNNING, controller.current()!!.status)
+    }
+
+    @Test
     fun lowerRevisionStateCannotReplaceCurrentOwner() = runTest {
         val controller = FakeController().also {
             it.mergeRemote(record(SessionOwner.MOBILE).copy(revision = 5))
@@ -160,13 +181,13 @@ class MobileSyncCoordinatorTest {
 
         override suspend fun session(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }
 
-        override suspend fun pauseFromRemote(): SessionRecord? = record.copy(status = SessionStatus.PAUSED).also { record = it }
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.PAUSED)?.also { record = it }
 
-        override suspend fun resumeFromRemote(): SessionRecord? = record.copy(status = SessionStatus.RUNNING).also { record = it }
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.RUNNING)?.also { record = it }
 
-        override suspend fun finishFromRemote(cancelled: Boolean): SessionRecord? = record.copy(
+        override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(
             status = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED,
-        ).also { record = it }
+        )?.also { record = it }
 
         override suspend fun becomeMobileOwner(sessionId: String): SessionRecord? =
             record.takeIf { it.id == sessionId }?.copy(owner = SessionOwner.MOBILE, revision = record.revision + 1)

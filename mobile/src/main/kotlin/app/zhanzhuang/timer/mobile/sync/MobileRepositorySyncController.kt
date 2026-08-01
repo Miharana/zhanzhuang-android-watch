@@ -43,11 +43,11 @@ class MobileRepositorySyncController(
 
     override suspend fun session(sessionId: String): SessionRecord? = repository.get(sessionId)
 
-    override suspend fun pauseFromRemote(): SessionRecord? = transitionActive(SessionStatus.PAUSED)
+    override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = transitionActive(sessionId, SessionStatus.PAUSED)
 
-    override suspend fun resumeFromRemote(): SessionRecord? = transitionActive(SessionStatus.RUNNING)
+    override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = transitionActive(sessionId, SessionStatus.RUNNING)
 
-    override suspend fun finishFromRemote(cancelled: Boolean): SessionRecord? = transitionActive(
+    override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = transitionActive(sessionId,
         if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED,
     )
 
@@ -92,8 +92,8 @@ class MobileRepositorySyncController(
         return winner
     }
 
-    private suspend fun transitionActive(status: SessionStatus): SessionRecord? {
-        val active = repository.activeSession() ?: return null
+    private suspend fun transitionActive(sessionId: String, status: SessionStatus): SessionRecord? {
+        val active = repository.activeSession()?.takeIf { it.id == sessionId } ?: return null
         return active.copy(
             status = status,
             revision = active.revision + 1,

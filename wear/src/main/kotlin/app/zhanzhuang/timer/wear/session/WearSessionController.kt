@@ -70,6 +70,7 @@ class WearSessionControllerImpl(
     private val clock: WearSessionClock = AndroidWearSessionClock,
     private val haptics: HapticCuePlayer,
     private val bootId: () -> String = { System.getProperty("ro.boot_id") ?: "unknown" },
+    private val completionSyncScheduler: () -> Unit = {},
 ) : WearSessionController {
     private val mutex = Mutex()
     private val _state = MutableStateFlow(emptyState())
@@ -416,6 +417,7 @@ class WearSessionControllerImpl(
         val complete = record!!
         val eventId = "${complete.id}:${complete.revision}"
         records.completeWithOutbox(complete, unflushedSamples.toList(), eventId, complete.toOutboxPayload(eventId))
+        completionSyncScheduler()
         unflushedSamples.clear()
         saveSnapshotOnly(snapshotBootId)
         lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
@@ -428,6 +430,7 @@ class WearSessionControllerImpl(
         if (terminal.status == SessionStatus.COMPLETED) {
             val eventId = "${terminal.id}:${terminal.revision}"
             records.completeWithOutbox(terminal, unflushedSamples.toList(), eventId, terminal.toOutboxPayload(eventId))
+            completionSyncScheduler()
         } else {
             records.checkpoint(terminal, unflushedSamples.toList())
         }

@@ -459,6 +459,20 @@ class WearSessionControllerTest {
         assertEquals(SessionStatus.COMPLETED, store.latest()!!.status)
     }
 
+    @Test
+    fun completedTransactionSchedulesDurableOutboxDelivery() = runTest {
+        var schedules = 0
+        val controller = WearSessionControllerImpl(
+            RecordingStore(), RecordingSnapshots(), RecordingHealth(), AdjustableClock(), RecordingHaptics(),
+            bootId = { "boot" }, completionSyncScheduler = { schedules += 1 },
+        )
+
+        controller.start(SessionConfig(15, 5), "s1")
+        controller.finish()
+
+        assertEquals(1, schedules)
+    }
+
     private fun record(
         status: SessionStatus,
         samples: List<HeartRateSample> = emptyList(),

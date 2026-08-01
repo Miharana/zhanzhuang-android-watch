@@ -50,6 +50,7 @@ class WearSessionService : Service() {
             health = health,
             haptics = AndroidHapticCuePlayer(getSystemService(Vibrator::class.java)),
             bootId = { currentBootId(applicationContext) },
+            completionSyncScheduler = { app.zhanzhuang.timer.wear.sync.WearCompletionSyncWorker.enqueue(applicationContext) },
         )
         notification = OngoingSessionNotification(applicationContext)
         commands = WearSessionCommandProcessor(controller)

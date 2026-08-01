@@ -29,9 +29,9 @@ interface WearSyncController {
     suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord
     suspend fun current(): SessionRecord?
     suspend fun session(sessionId: String): SessionRecord?
-    suspend fun pauseFromRemote(): SessionRecord?
-    suspend fun resumeFromRemote(): SessionRecord?
-    suspend fun finishFromRemote(cancelled: Boolean): SessionRecord?
+    suspend fun pauseFromRemote(sessionId: String): SessionRecord?
+    suspend fun resumeFromRemote(sessionId: String): SessionRecord?
+    suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord?
     suspend fun mergeRemote(record: SessionRecord): SessionRecord
 }
 
@@ -56,22 +56,20 @@ class WearSyncCoordinator(
                 controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it) } != null
             }
             SyncPayload.QueryState -> controller?.current()?.let { sendState(it) } != null
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote()?.let { sendState(it) } != null
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote()?.let { sendState(it) } != null
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(payload.cancelled)?.let { sendState(it) } != null
+            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it) } != null
+            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it) } != null
+            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it) } != null
             is SyncPayload.CancelIfUnowned -> {
                 val current = controller?.current() ?: return false
-                if (current.revision <= payload.ownerRevision) controller.finishFromRemote(cancelled = true)?.let { sendState(it) } != null else false
+                if (current.id == envelope.sessionId && current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it) } != null else false
             }
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> mergeRemote(payload.record)
         }
     }
 
-    suspend fun resendCompleted() = mutex.withLock {
-        outbox.pendingCompleted().forEach { entry ->
-            transport.putCompleted(entry.envelope)
-        }
+    suspend fun resendCompleted(): Boolean = mutex.withLock {
+        outbox.pendingCompleted().all { entry -> transport.putCompleted(entry.envelope) }
     }
 
     private suspend fun acknowledge(eventId: String, sessionId: String, envelopeRevision: Long, acceptedRevision: Long): Boolean {

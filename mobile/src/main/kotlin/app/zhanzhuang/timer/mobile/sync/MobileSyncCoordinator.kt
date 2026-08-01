@@ -21,9 +21,9 @@ interface MobileSyncController {
     suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord
     suspend fun current(): SessionRecord?
     suspend fun session(sessionId: String): SessionRecord?
-    suspend fun pauseFromRemote(): SessionRecord?
-    suspend fun resumeFromRemote(): SessionRecord?
-    suspend fun finishFromRemote(cancelled: Boolean): SessionRecord?
+    suspend fun pauseFromRemote(sessionId: String): SessionRecord?
+    suspend fun resumeFromRemote(sessionId: String): SessionRecord?
+    suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord?
     suspend fun becomeMobileOwner(sessionId: String): SessionRecord?
     suspend fun mergeRemote(record: SessionRecord): SessionRecord
 }
@@ -48,14 +48,14 @@ class MobileSyncCoordinator(
         val sessionId = UUID.randomUUID().toString()
         val record = controller.startFromMobile(config, sessionId, revision = 1)
         val start = envelope(record, SyncPayload.Start(config, nowEpochMillis() + START_EXPIRY_MS))
-        transport.sendMessage(start)
+        scope.launch { runCatching { transport.sendMessage(start) } }
         fallbackJobs.remove(record.id)?.cancel()
         fallbackJobs[record.id] = scope.launch {
             delay(ACK_TIMEOUT_MS)
-            transport.sendMessage(envelope(record, SyncPayload.QueryState))
+            scope.launch { runCatching { transport.sendMessage(envelope(record, SyncPayload.QueryState)) } }
             delay(QUERY_TIMEOUT_MS)
             controller.becomeMobileOwner(record.id)?.let { local ->
-                transport.sendMessage(envelope(local, SyncPayload.State(local)))
+                scope.launch { runCatching { transport.sendMessage(envelope(local, SyncPayload.State(local))) } }
             }
         }
         return record
@@ -78,12 +78,12 @@ class MobileSyncCoordinator(
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> processCompleted(envelope, payload)
             is SyncPayload.Ack -> true
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller.pauseFromRemote()?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller.resumeFromRemote()?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller.finishFromRemote(payload.cancelled)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
+            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller.pauseFromRemote(envelope.sessionId)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
+            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller.resumeFromRemote(envelope.sessionId)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
+            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null
             is SyncPayload.CancelIfUnowned -> {
                 val current = controller.session(envelope.sessionId) ?: return false
-                if (current.revision <= payload.ownerRevision) controller.finishFromRemote(cancelled = true)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null else false
+                if (current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { transport.sendMessage(envelope(it, SyncPayload.State(it))) } != null else false
             }
         }
     }
@@ -95,7 +95,10 @@ class MobileSyncCoordinator(
     }
 
     private suspend fun processCompleted(envelope: SyncEnvelope, completed: SyncPayload.Completed): Boolean {
-        if (!mergeRemote(completed.record)) return false
+        val accepted = mergeRemote(completed.record) || controller.session(completed.record.id)?.let { existing ->
+            existing.status == app.zhanzhuang.timer.model.SessionStatus.COMPLETED && existing.revision >= completed.record.revision
+        } == true
+        if (!accepted) return false
         return transport.sendMessage(
             envelope(
                 completed.record,

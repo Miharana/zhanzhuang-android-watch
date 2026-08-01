@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -96,12 +97,12 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
             is app.zhanzhuang.timer.model.SyncPayload.State -> PATH_STATE
             else -> PATH_COMMAND
         }
-        val nodes = Wearable.getCapabilityClient(appContext)
+        val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
             .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_REACHABLE)
             .await()
-            .nodes
+            .nodes } ?: return false
         return nodes.map { node ->
-            runCatching { Wearable.getMessageClient(appContext).sendMessage(node.id, path, SyncWireCodec.encodeMessage(envelope)).await() }.isSuccess
+            runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getMessageClient(appContext).sendMessage(node.id, path, SyncWireCodec.encodeMessage(envelope)).await() } != null }.getOrDefault(false)
         }.any { it }
     }
 
@@ -109,8 +110,8 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
         val request = PutDataMapRequest.create("$PATH_COMPLETED/${envelope.eventId}").apply {
             dataMap.putByteArray(SyncWireCodec.DATA_KEY_ENVELOPE, SyncWireCodec.encodeCompleted(envelope))
         }.asPutDataRequest().setUrgent()
-        return runCatching { Wearable.getDataClient(appContext).putDataItem(request).await() }.isSuccess
+        return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getDataClient(appContext).putDataItem(request).await() } != null }.getOrDefault(false)
     }
 
-    private companion object { const val CAPABILITY_NAME = "zhan_zhang_sync" }
+    private companion object { const val CAPABILITY_NAME = "zhan_zhang_sync"; const val TRANSPORT_TIMEOUT_MS = 4_000L }
 }

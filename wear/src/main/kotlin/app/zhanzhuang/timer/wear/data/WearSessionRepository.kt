@@ -64,6 +64,8 @@ data class WearSessionWithSamples(
 
 @Dao
 interface WearSessionDao {
+    @Query("SELECT * FROM wear_sessions WHERE status IN ('STARTING', 'RUNNING', 'PAUSED', 'COMPLETING') ORDER BY startedAtEpochMillis DESC LIMIT 1")
+    suspend fun activeSession(): WearSessionEntity?
     @Query("SELECT * FROM wear_sessions WHERE id = :id")
     suspend fun session(id: String): WearSessionEntity?
 
@@ -132,6 +134,10 @@ class WearSessionRepository(private val dao: WearSessionDao) {
 
     suspend fun get(id: String): SessionRecord? = dao.sessionWithSamples(id)?.let { aggregate ->
         aggregate.session.toRecord(aggregate.samples.sortedBy(WearHeartRateEntity::epochMillis))
+    }
+
+    suspend fun activeSession(): SessionRecord? = dao.activeSession()?.let { session ->
+        session.toRecord(dao.samples(session.id))
     }
 
     suspend fun upsert(record: SessionRecord) {

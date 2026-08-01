@@ -8,6 +8,7 @@ import android.content.Intent
 class SessionRecoveryReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        app.zhanzhuang.timer.wear.sync.WearCompletionSyncWorker.enqueue(context)
         context.startForegroundService(
             Intent(context, WearSessionService::class.java).setAction(WearSessionService.ACTION_STATUS),
         )
