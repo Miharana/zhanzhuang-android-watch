@@ -187,12 +187,8 @@ class AndroidHealthConnectGateway(
         fun sessionMetadata(record: SessionRecord, device: Device = phoneDevice()): Metadata =
             recordedMetadata(sessionClientRecordId(record), record, device)
 
-        fun rethrowCancellation(error: Exception): Boolean {
-            if (error is CancellationException) throw error
-            return false
-        }
-
         fun writeFailure(error: Exception): HealthWriteResult = when (error) {
+            is CancellationException -> throw error
             is IOException,
             is RemoteException,
             -> HealthWriteResult.Retryable(error.message ?: "Health Connect transport failure")

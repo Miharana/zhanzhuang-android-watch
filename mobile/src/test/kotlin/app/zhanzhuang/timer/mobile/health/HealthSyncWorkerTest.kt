@@ -133,9 +133,9 @@ class HealthSyncWorkerTest {
     }
 
     @Test
-    fun cancellationIsNotTranslatedToAHealthFailure() {
+    fun writeFailureRethrowsCancellationInsteadOfConvertingIt() {
         assertFailsWith<CancellationException> {
-            AndroidHealthConnectGateway.rethrowCancellation(CancellationException("cancelled"))
+            AndroidHealthConnectGateway.writeFailure(CancellationException("cancelled"))
         }
     }
 

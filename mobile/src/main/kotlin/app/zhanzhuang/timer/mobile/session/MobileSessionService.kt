@@ -18,6 +18,7 @@ import app.zhanzhuang.timer.mobile.health.HealthSyncWorker
 import app.zhanzhuang.timer.model.SessionConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +51,8 @@ open class MobileSessionService : Service() {
         serviceScope.launch {
             try {
                 HealthSyncWorker.reconcile(applicationContext)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
                 // Reconciliation is opportunistic; timer recovery must remain available offline.
             }
         }
