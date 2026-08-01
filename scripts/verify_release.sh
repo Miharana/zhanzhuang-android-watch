@@ -9,31 +9,7 @@ fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need_command() { command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"; }
 require_file() { [[ -s "$1" ]] || fail "missing required file: ${1#$repo_root/}"; }
 require_text() { grep -Fq -- "$2" "$1" || fail "${1#$repo_root/} must contain required release text"; }
-image_size() { sips -g pixelWidth -g pixelHeight "$1" 2>/dev/null | awk '/pixelWidth:/{w=$2} /pixelHeight:/{h=$2} END {if (w && h) print w "x" h}'; }
-image_has_alpha() { sips -g hasAlpha "$1" 2>/dev/null | awk '/hasAlpha:/{print $2}'; }
-image_property() { sips -g "$2" "$1" 2>/dev/null | awk -v property="$2" '$1 == property ":" { print $2; exit }'; }
-
-verify_play_icon() {
-    local icon=$1 format bits samples alpha
-    [[ $(image_size "$icon") == '512x512' ]] || fail 'Play icon must be 512x512'
-    format=$(image_property "$icon" format)
-    bits=$(image_property "$icon" bitsPerSample)
-    samples=$(image_property "$icon" samplesPerPixel)
-    alpha=$(image_has_alpha "$icon")
-    [[ "$format" == png && "$bits" == 8 && "$samples" == 4 && "$alpha" == yes ]] || fail 'Play icon must be 8-bit RGBA/32-bit PNG with alpha'
-    [[ $(stat -f '%z' "$icon") -le 1048576 ]] || fail 'Play icon exceeds 1 MiB'
-}
-
-verify_wear_screenshot() {
-    local screenshot=$1 dimensions width height
-    dimensions=$(image_size "$screenshot"); width=${dimensions%x*}; height=${dimensions#*x}
-    [[ "$width" == "$height" && "$width" -ge 384 && "$width" -le 3840 ]] || fail 'Wear screenshot must be square and between 384px and 3840px'
-    [[ $(image_has_alpha "$screenshot") == 'no' ]] || fail 'Wear screenshot must not have alpha'
-}
-
-if [[ "${VERIFY_RELEASE_LIB_ONLY:-}" == 1 ]]; then
-    return 0 2>/dev/null || exit 0
-fi
+. "$repo_root/scripts/lib/release_image_checks.sh"
 
 # Keep these checks first: do not perform Gradle or credential work with an incomplete key.
 : "${ZHANZHUANG_KEYSTORE_PATH:?missing ZHANZHUANG_KEYSTORE_PATH}"

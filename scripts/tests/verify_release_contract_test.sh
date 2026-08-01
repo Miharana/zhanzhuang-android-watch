@@ -4,12 +4,15 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 verifier="$repo_root/scripts/verify_release.sh"
+image_checks="$repo_root/scripts/lib/release_image_checks.sh"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 require_file() { [[ -f "$1" ]] || fail "missing $1"; }
 require_text() { grep -Fq -- "$2" "$1" || fail "$1 must contain: $2"; }
 
 require_file "$verifier"
+require_file "$image_checks"
+[[ ! -x "$image_checks" ]] || fail 'release image helper must remain non-executable'
 require_text "$verifier" 'missing ZHANZHUANG_KEYSTORE_PATH'
 require_text "$verifier" 'missing ZHANZHUANG_KEY_ALIAS'
 require_text "$verifier" 'missing ZHANZHUANG_STORE_PASSWORD'
@@ -35,26 +38,39 @@ require_text "$verifier" '2000001'
 require_text "$verifier" 'app.zhanzhuang.timer'
 require_text "$verifier" '"$height" -le $((2 * width))'
 require_text "$verifier" 'packaged_res/release/packageReleaseResources/values-zh-rCN/values-zh-rCN.xml'
+if grep -Fq 'VERIFY_RELEASE_LIB_ONLY' "$verifier"; then
+    fail 'production verifier must not contain an environment-controlled bypass'
+fi
 
 # Image validators are loaded as a library so deliberately invalid, temporary fixtures
 # exercise the same checks used by the release gate.
 set +e
-VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon /dev/null' _ "$verifier" >"${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out" 2>&1
+bash -c 'fail() { printf "%s\n" "$*" >&2; exit 1; }; source "$1"; verify_play_icon /dev/null' _ "$image_checks" >"${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out" 2>&1
 image_status=$?
 set -e
 [[ $image_status -ne 0 ]] || fail 'invalid icon fixture must be rejected by the release image validator'
 grep -Fq 'Play icon' "${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out" || fail 'icon fixture must reach the release image validator'
 rm -f "${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out"
 
+set +e
+env -u ZHANZHUANG_KEYSTORE_PATH -u ZHANZHUANG_KEY_ALIAS -u ZHANZHUANG_STORE_PASSWORD -u ZHANZHUANG_KEY_PASSWORD \
+    VERIFY_RELEASE_LIB_ONLY=1 bash "$verifier" >"${TMPDIR:-/tmp}/zhan-zhuang-release-bypass.out" 2>&1
+bypass_status=$?
+set -e
+[[ $bypass_status -ne 0 ]] || fail 'legacy library flag must not bypass direct release verification'
+first_line=$(sed -n '1p' "${TMPDIR:-/tmp}/zhan-zhuang-release-bypass.out")
+[[ "$first_line" == *'missing ZHANZHUANG_KEYSTORE_PATH'* ]] || fail 'legacy library flag must still fail first on ZHANZHUANG_KEYSTORE_PATH'
+rm -f "${TMPDIR:-/tmp}/zhan-zhuang-release-bypass.out"
+
 fixture_dir=$(mktemp -d "${TMPDIR:-/tmp}/zhan-zhuang-image-fixtures.XXXXXX")
 trap 'rm -rf "$fixture_dir"' EXIT
-VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon "$2"; verify_wear_screenshot "$3"' _ \
-    "$verifier" \
+bash -c 'fail() { printf "%s\n" "$*" >&2; exit 1; }; source "$1"; verify_play_icon "$2"; verify_wear_screenshot "$3"' _ \
+    "$image_checks" \
     "$repo_root/fastlane/metadata/android/en-US/images/icon.png" \
     "$repo_root/fastlane/metadata/android/en-US/images/wearScreenshots/01.png"
 sips -z 512 512 "$repo_root/fastlane/metadata/android/en-US/images/featureGraphic.png" --out "$fixture_dir/rgb-icon.png" >/dev/null
 set +e
-VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon "$2"' _ "$verifier" "$fixture_dir/rgb-icon.png" >"$fixture_dir/icon.out" 2>&1
+bash -c 'fail() { printf "%s\n" "$*" >&2; exit 1; }; source "$1"; verify_play_icon "$2"' _ "$image_checks" "$fixture_dir/rgb-icon.png" >"$fixture_dir/icon.out" 2>&1
 image_status=$?
 set -e
 [[ $image_status -ne 0 ]] || fail 'RGB icon fixture must be rejected'
@@ -62,7 +78,7 @@ grep -Fq '8-bit RGBA/32-bit PNG with alpha' "$fixture_dir/icon.out" || fail 'RGB
 
 sips -z 4000 4000 "$repo_root/fastlane/metadata/android/en-US/images/wearScreenshots/01.png" --out "$fixture_dir/oversize-wear.png" >/dev/null
 set +e
-VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_wear_screenshot "$2"' _ "$verifier" "$fixture_dir/oversize-wear.png" >"$fixture_dir/wear.out" 2>&1
+bash -c 'fail() { printf "%s\n" "$*" >&2; exit 1; }; source "$1"; verify_wear_screenshot "$2"' _ "$image_checks" "$fixture_dir/oversize-wear.png" >"$fixture_dir/wear.out" 2>&1
 image_status=$?
 set -e
 [[ $image_status -ne 0 ]] || fail 'oversize Wear fixture must be rejected'
