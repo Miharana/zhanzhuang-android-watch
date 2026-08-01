@@ -55,13 +55,16 @@ class AndroidWearHealthClient(
     }
 
     override suspend fun start(): WearHealthStartResult {
-        ownsExercise = false
         var startedExerciseInThisCall = false
         try {
             val info = exerciseClient.getCurrentExerciseInfo()
             val existingExercise = info.toExistingExercise()
-            if (existingExercise == ExistingExercise.OWNED) {
-                ownsExercise = true
+            when (existingExercise) {
+                ExistingExercise.NONE,
+                ExistingExercise.OTHER_APP,
+                -> ownsExercise = false
+                ExistingExercise.OWNED -> ownsExercise = true
+                ExistingExercise.UNKNOWN -> Unit
             }
             val capabilities = exerciseClient.getCapabilities()
             val result = startResultFor(existingExercise, capabilities.supportsHeartRate())

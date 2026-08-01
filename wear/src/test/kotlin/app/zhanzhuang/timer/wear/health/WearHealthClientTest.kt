@@ -229,7 +229,82 @@ class WearHealthClientTest {
         assertEquals(1, calls.count { it == "endExerciseAsync" })
     }
 
-    private data class FakeExerciseFailures(var remainingEndFailures: Int = 0)
+    @Suppress("RestrictedApi")
+    @Test
+    fun repeatedStartStatusLookupCancellationIsRethrownAndKeepsOurExerciseEndable() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val failures = FakeExerciseFailures()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.NO_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                failures = failures,
+            ),
+        )
+
+        assertEquals(WearHealthStartResult.Started, client.start())
+        failures.currentExerciseInfoFailure = CancellationException("status lookup cancelled")
+
+        assertFailsWith<CancellationException> { client.start() }
+        client.end()
+
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
+    fun repeatedStartStatusLookupPermissionFailureKeepsOurExerciseEndable() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val failures = FakeExerciseFailures()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.NO_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                failures = failures,
+            ),
+        )
+
+        assertEquals(WearHealthStartResult.Started, client.start())
+        failures.currentExerciseInfoFailure = SecurityException("status lookup denied")
+
+        assertEquals(
+            WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.PERMISSION_DENIED),
+            client.start(),
+        )
+        client.end()
+
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    @Suppress("RestrictedApi")
+    @Test
+    fun repeatedStartStatusLookupHealthServicesFailureKeepsOurExerciseEndable() = kotlinx.coroutines.test.runTest {
+        val calls = mutableListOf<String>()
+        val failures = FakeExerciseFailures()
+        val client = AndroidWearHealthClient(
+            fakeExerciseClient(
+                status = ExerciseTrackedStatus.NO_EXERCISE_IN_PROGRESS,
+                calls = calls,
+                failures = failures,
+            ),
+        )
+
+        assertEquals(WearHealthStartResult.Started, client.start())
+        failures.currentExerciseInfoFailure = HealthServicesException("status lookup unavailable")
+
+        assertEquals(
+            WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE),
+            client.start(),
+        )
+        client.end()
+
+        assertEquals(1, calls.count { it == "endExerciseAsync" })
+    }
+
+    private data class FakeExerciseFailures(
+        var remainingEndFailures: Int = 0,
+        var currentExerciseInfoFailure: Throwable? = null,
+    )
 
     private fun fakeExerciseClient(
         status: Int,
@@ -244,7 +319,8 @@ class WearHealthClientTest {
     ) { _, method, _ ->
         calls += method.name
         when (method.name) {
-            "getCurrentExerciseInfoAsync" -> Futures.immediateFuture(ExerciseInfo(status, ExerciseType.MEDITATION))
+            "getCurrentExerciseInfoAsync" -> failures.currentExerciseInfoFailure?.let { Futures.immediateFailedFuture(it) }
+                ?: Futures.immediateFuture(ExerciseInfo(status, ExerciseType.MEDITATION))
             "getCapabilitiesAsync" -> capabilitiesFailure?.let { Futures.immediateFailedFuture(it) }
                 ?: Futures.immediateFuture(
                     ExerciseCapabilities(

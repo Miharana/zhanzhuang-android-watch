@@ -1,6 +1,7 @@
 package app.zhanzhuang.timer.wear.data
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -8,6 +9,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Relation
 import androidx.room.Transaction
 import androidx.room.Update
 import app.zhanzhuang.timer.model.HeartRateSample
@@ -51,6 +53,15 @@ data class WearHeartRateEntity(
     val accuracy: String,
 )
 
+data class WearSessionWithSamples(
+    @Embedded val session: WearSessionEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "sessionId",
+    )
+    val samples: List<WearHeartRateEntity>,
+)
+
 @Dao
 interface WearSessionDao {
     @Query("SELECT * FROM wear_sessions WHERE id = :id")
@@ -58,6 +69,10 @@ interface WearSessionDao {
 
     @Query("SELECT * FROM wear_heart_rate_samples WHERE sessionId = :sessionId ORDER BY epochMillis")
     suspend fun samples(sessionId: String): List<WearHeartRateEntity>
+
+    @Transaction
+    @Query("SELECT * FROM wear_sessions WHERE id = :id")
+    suspend fun sessionWithSamples(id: String): WearSessionWithSamples?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSession(entity: WearSessionEntity): Long
@@ -111,11 +126,11 @@ interface WearSessionDao {
     }
 }
 
-class WearSessionRepository(database: WearDatabase) {
-    private val dao = database.wearSessionDao()
+class WearSessionRepository(private val dao: WearSessionDao) {
+    constructor(database: WearDatabase) : this(database.wearSessionDao())
 
-    suspend fun get(id: String): SessionRecord? = dao.session(id)?.let { entity ->
-        entity.toRecord(dao.samples(id))
+    suspend fun get(id: String): SessionRecord? = dao.sessionWithSamples(id)?.let { aggregate ->
+        aggregate.session.toRecord(aggregate.samples.sortedBy(WearHeartRateEntity::epochMillis))
     }
 
     suspend fun upsert(record: SessionRecord) {

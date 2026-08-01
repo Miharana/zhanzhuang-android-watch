@@ -310,3 +310,92 @@ The outbox delete predicate is now `revision = :acknowledgedRevision`. The focus
 - The change is limited to exact event/revision ACK matching; it does not add Data Layer transport, retry processing, or UI/service scope.
 - A future transport ACK carrying a later revision can no longer erase a durable earlier-revision event.
 - Commit: `ac92e89 fix: require exact Wear outbox ACK revision`.
+
+---
+
+## Root-review fixes: repeated-start ownership and atomic session read
+
+### Scope
+
+Implemented only the requested root-review fixes. No Task 5 service/UI behavior and no Task 6 Data Layer behavior changed.
+
+### RED — repeated start after a previously owned exercise
+
+Added three regressions that first start an adapter-owned exercise, then make the next `getCurrentExerciseInfo()` fail. Each test asserts that cancellation is rethrown, ordinary failures return the honest `StartedWithoutUpdates` result, and a following `end()` still invokes Health Services:
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest --rerun-tasks \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.repeatedStartStatusLookupCancellationIsRethrownAndKeepsOurExerciseEndable' \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.repeatedStartStatusLookupPermissionFailureKeepsOurExerciseEndable' \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest.repeatedStartStatusLookupHealthServicesFailureKeepsOurExerciseEndable'
+```
+
+Result: failed as expected with three `AssertionError`s at `WearHealthClientTest.kt:234`, `:256`, and `:281`. The old first line of `start()` cleared `ownsExercise` before status lookup; all three follow-up `end()` calls became no-ops.
+
+### GREEN — repeated-start ownership
+
+`start()` no longer clears ownership before status lookup. A successful status read clears it only for a definitive `NONE` or `OTHER_APP` result, records it for a definitive `OWNED` result, and leaves the prior value intact for `UNKNOWN`. Thus a failed lookup cannot lose a known app-owned exercise, while a known third-party exercise remains non-endable. The same focused `--rerun-tasks` command passed with `BUILD SUCCESSFUL`.
+
+### RED — atomic repository read
+
+Added `getUsesOneAtomicAggregateDaoRead`, a deterministic repository contract test. Its DAO wrapper fails immediately if repository `get()` calls the legacy `session()` or `samples()` APIs, and records exactly one aggregate-read call. Before production code was added, the test intentionally failed at compilation because `WearSessionWithSamples`, `sessionWithSamples`, and the DAO-injected repository constructor did not exist:
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest --rerun-tasks \
+  --tests 'app.zhanzhuang.timer.wear.data.WearSessionRepositoryTest.getUsesOneAtomicAggregateDaoRead'
+```
+
+Result: `:wear:compileDebugUnitTestKotlin FAILED` with the expected missing aggregate API and constructor errors.
+
+### GREEN — atomic repository read
+
+Added Room's `WearSessionWithSamples` relation projection and a single-session `@Transaction` DAO query, `sessionWithSamples(id)`. `WearSessionRepository.get()` now consumes that aggregate directly. The contract test proves a single aggregate DAO call returns both saved samples and never reaches the legacy split-read methods; Room performs the one-parent relation read in the DAO transaction, so it has no N+1 behavior beyond the one session being read. The focused aggregate command passed with `BUILD SUCCESSFUL`.
+
+### RED/GREEN — aggregate heart-rate ordering
+
+The follow-up contract test `getOrdersAggregateHeartRateSamplesChronologically` wraps the real DAO but deliberately returns its aggregate samples in descending timestamp order. Before the mapping change it failed as expected at `WearSessionRepositoryTest.kt:96`:
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest --rerun-tasks \
+  --tests 'app.zhanzhuang.timer.wear.data.WearSessionRepositoryTest.getOrdersAggregateHeartRateSamplesChronologically'
+```
+
+`get()` now sorts aggregate samples by `epochMillis` before constructing `SessionRecord`. The same command then passed with `BUILD SUCCESSFUL`.
+
+### Focused verification
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest --rerun-tasks \
+  --tests 'app.zhanzhuang.timer.wear.health.WearHealthClientTest' \
+  --tests 'app.zhanzhuang.timer.wear.data.WearSessionRepositoryTest'
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain :wear:testDebugUnitTest :wear:lintDebug
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
+./gradlew --console=plain test
+```
+
+Result: all commands were `BUILD SUCCESSFUL`; the focused health/persistence run covered 15 health and 6 persistence tests, all with zero failures/errors. Full repository test ran 132 actionable tasks.
+
+```sh
+MANIFEST_PATH=wear/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+if rg -n -i 'location|access_(fine|coarse)_location|gps|internet' "$MANIFEST_PATH"; then exit 1; else echo 'no forbidden manifest matches'; fi
+git diff --check
+```
+
+Result: `no forbidden manifest matches`; diff check clean.
+
+### Residual concern
+
+On an `UNKNOWN` status response, the adapter deliberately preserves prior ownership per the review requirement; it never establishes ownership from `UNKNOWN`. A definitive `OTHER_APP` response always clears ownership, preventing takeover of a third-party exercise.

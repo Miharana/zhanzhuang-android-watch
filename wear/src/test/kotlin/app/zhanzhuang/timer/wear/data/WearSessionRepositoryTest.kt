@@ -2,6 +2,8 @@ package app.zhanzhuang.timer.wear.data
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import app.zhanzhuang.timer.model.HeartRateSample
+import app.zhanzhuang.timer.model.SampleAccuracy
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
@@ -76,12 +78,74 @@ class WearSessionRepositoryTest {
         )
     }
 
-    private fun record(revision: Long, status: SessionStatus) = SessionRecord(
+    @Test
+    fun getUsesOneAtomicAggregateDaoRead() = runTest {
+        val samples = listOf(
+            HeartRateSample(epochMillis = 1_001, bpm = 60.0, accuracy = SampleAccuracy.HIGH),
+            HeartRateSample(epochMillis = 1_002, bpm = 61.0, accuracy = SampleAccuracy.HIGH),
+        )
+        repository.upsert(record(revision = 2, status = SessionStatus.COMPLETED, samples = samples))
+        val aggregateDao = AggregateOnlyWearSessionDao(database.wearSessionDao())
+        val aggregateRepository = WearSessionRepository(aggregateDao)
+
+        assertEquals(samples, aggregateRepository.get("s1")!!.heartRateSamples)
+        assertEquals(1, aggregateDao.aggregateReadCalls)
+    }
+
+    @Test
+    fun getOrdersAggregateHeartRateSamplesChronologically() = runTest {
+        val samples = listOf(
+            HeartRateSample(epochMillis = 1_002, bpm = 61.0, accuracy = SampleAccuracy.HIGH),
+            HeartRateSample(epochMillis = 1_001, bpm = 60.0, accuracy = SampleAccuracy.HIGH),
+        )
+        repository.upsert(record(revision = 2, status = SessionStatus.COMPLETED, samples = samples))
+        val unsortedAggregateRepository = WearSessionRepository(
+            UnsortedAggregateWearSessionDao(database.wearSessionDao()),
+        )
+
+        assertEquals(
+            samples.sortedBy(HeartRateSample::epochMillis),
+            unsortedAggregateRepository.get("s1")!!.heartRateSamples,
+        )
+    }
+
+    private fun record(
+        revision: Long,
+        status: SessionStatus,
+        samples: List<HeartRateSample> = emptyList(),
+    ) = SessionRecord(
         id = "s1",
         revision = revision,
         config = SessionConfig(15, 5),
         status = status,
         owner = SessionOwner.WEAR,
         startEpochMillis = 1_000,
+        heartRateSamples = samples,
     )
+
+    private class AggregateOnlyWearSessionDao(
+        private val delegate: WearSessionDao,
+    ) : WearSessionDao by delegate {
+        var aggregateReadCalls = 0
+
+        override suspend fun sessionWithSamples(id: String): WearSessionWithSamples? {
+            aggregateReadCalls += 1
+            return delegate.sessionWithSamples(id)
+        }
+
+        override suspend fun session(id: String): WearSessionEntity? =
+            error("Repository get must use the aggregate DAO read")
+
+        override suspend fun samples(sessionId: String): List<WearHeartRateEntity> =
+            error("Repository get must use the aggregate DAO read")
+    }
+
+    private class UnsortedAggregateWearSessionDao(
+        private val delegate: WearSessionDao,
+    ) : WearSessionDao by delegate {
+        override suspend fun sessionWithSamples(id: String): WearSessionWithSamples? =
+            delegate.sessionWithSamples(id)?.let { aggregate ->
+                aggregate.copy(samples = aggregate.samples.sortedByDescending { it.epochMillis })
+            }
+    }
 }
