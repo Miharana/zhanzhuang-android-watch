@@ -43,7 +43,7 @@ fun ActiveSessionScreen(
         ScreenColumn {
             Text(if (paused) stringResource(R.string.paused) else stringResource(R.string.standing), color = colors.primaryContainer)
             Text(
-                text = if (ambient) "${(state.remainingMs + 59_999L) / 60_000L} min" else formatWearDuration(state.remainingMs),
+                text = if (ambient) stringResource(R.string.minutes_value, (state.remainingMs + 59_999L) / 60_000L) else formatWearDuration(state.remainingMs),
                 color = colors.onBackground,
                 style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 30.sp, fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,

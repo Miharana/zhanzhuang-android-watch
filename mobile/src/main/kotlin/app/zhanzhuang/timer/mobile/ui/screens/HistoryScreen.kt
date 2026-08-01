@@ -54,5 +54,14 @@ fun HistoryScreen(records: List<SessionRecord>, stats: HistoryStats, onOpen: (Se
 
 @Composable private fun Stat(label: String, value: Long) { Column { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(formatMinutes(value), fontWeight = FontWeight.Bold) } }
 @Composable private fun date(record: SessionRecord) = record.startEpochMillis?.let { DateTimeFormatter.ofPattern("d MMM, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(it)) } ?: stringResource(R.string.unknown_time)
-@Composable internal fun truthfulStatus(record: SessionRecord) = when (record.status) { app.zhanzhuang.timer.model.SessionStatus.COMPLETED -> stringResource(R.string.terminal_completed); app.zhanzhuang.timer.model.SessionStatus.CANCELLED -> stringResource(R.string.terminal_cancelled); app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED -> stringResource(R.string.terminal_interrupted); else -> record.status.name.lowercase().replaceFirstChar(Char::uppercase) }
+@Composable internal fun truthfulStatus(record: SessionRecord) = when (record.status) {
+    app.zhanzhuang.timer.model.SessionStatus.IDLE -> stringResource(R.string.status_idle)
+    app.zhanzhuang.timer.model.SessionStatus.STARTING -> stringResource(R.string.status_starting)
+    app.zhanzhuang.timer.model.SessionStatus.RUNNING -> stringResource(R.string.status_running)
+    app.zhanzhuang.timer.model.SessionStatus.PAUSED -> stringResource(R.string.status_paused)
+    app.zhanzhuang.timer.model.SessionStatus.COMPLETING -> stringResource(R.string.status_completing)
+    app.zhanzhuang.timer.model.SessionStatus.COMPLETED -> stringResource(R.string.status_completed)
+    app.zhanzhuang.timer.model.SessionStatus.CANCELLED -> stringResource(R.string.status_cancelled)
+    app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED -> stringResource(R.string.status_interrupted)
+}
 @Composable internal fun formatMinutes(milliseconds: Long) = stringResource(R.string.minutes_value, milliseconds / 60_000L)

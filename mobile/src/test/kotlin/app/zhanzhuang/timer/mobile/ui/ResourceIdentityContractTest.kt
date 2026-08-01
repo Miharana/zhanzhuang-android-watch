@@ -18,6 +18,20 @@ class ResourceIdentityContractTest {
         ).forEach { assertTrue(it in copy, "missing $it") }
     }
 
+    @Test fun sessionStatusesAndPrivacyAreLocalized() {
+        val english = copy("values")
+        val chinese = copy("values-zh-rCN")
+        setOf("status_idle", "status_starting", "status_running", "status_paused", "status_completing", "status_completed", "status_cancelled", "status_interrupted")
+            .forEach { key -> assertTrue(key in english && key in chinese, "missing $key") }
+        assertTrue(english.getValue("local_only_privacy").contains("paired watch"))
+        assertTrue(chinese.getValue("local_only_privacy").contains("配对手表"))
+    }
+
+    @Test fun formatPlaceholdersMatchAcrossLocales() = assertEquals(
+        placeholders(copy("values")),
+        placeholders(copy("values-zh-rCN")),
+    )
+
     @Test fun forbiddenClaimsAreAbsent() {
         val allCopy = listOf(copy("values"), copy("values-zh-rCN")).flatMap { it.values }.joinToString(" ").lowercase()
         listOf("治愈", "治疗", "诊断", "burn calories", "weight loss", "premium", "advertisement")
@@ -34,6 +48,10 @@ class ResourceIdentityContractTest {
     }
 
     private fun keys(locale: String) = copy(locale).keys
+
+    private fun placeholders(copy: Map<String, String>) = copy.mapValues { (_, value) ->
+        Regex("%\\d+\\$[ds]").findAll(value).map { it.value }.toList()
+    }
 
     private fun copy(locale: String): Map<String, String> {
         val file = resource("$locale/strings.xml")

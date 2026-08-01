@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -161,10 +162,12 @@ private fun WatchStatus(state: TrainingUiState) {
 
 @Composable
 private fun Stepper(value: String, description: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+    val decreaseDescription = stringResource(R.string.decrease, description)
+    val increaseDescription = stringResource(R.string.increase, description)
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = onMinus, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("−") }
+        OutlinedButton(onClick = onMinus, modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = decreaseDescription }) { Text("−") }
         Text(value, modifier = Modifier.weight(2f).wrapContentWidth(Alignment.CenterHorizontally).semantics { stateDescription = description }, style = MaterialTheme.typography.titleLarge)
-        OutlinedButton(onClick = onPlus, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("+") }
+        OutlinedButton(onClick = onPlus, modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = increaseDescription }) { Text("+") }
     }
 }
 
