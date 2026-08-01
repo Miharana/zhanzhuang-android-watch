@@ -35,14 +35,25 @@ Date (UTC): 2026-08-01T08:16:32Z
    uncommitted edit probe for `app.zhanzhuang.timer` returned
    `package-not-found-or-not-authorized`; no AAB, metadata, image, or release
    was committed. The edit was discarded in the probe cleanup path.
-3. A Play Console session then reached `https://play.google.com/console/signup`
+3. The candidate credential was then tested against the known existing
+   Miharana Android package `com.urticad.miharana`. It read its `internal` and
+   `production` track releases successfully (both report code `11`,
+   `completed`) through a transient uncommitted edit that was discarded. The
+   credential is therefore connected to Google Play and has access to that
+   known app; it does **not** establish access to `app.zhanzhuang.timer`.
+4. Browser-session audit: the only browser surface made available by this
+   environment was **Chrome**; no in-app-browser session was available to try.
+   Its Play Console route reached `https://play.google.com/console/signup`
    with the title **Creating a developer account**, rather than an existing
    verified developer dashboard. No Console form was submitted.
 
-This proves neither package registration nor app-specific service-account
-access. It also provides no exact Wear internal track identifier. Uploading a
-mobile binary, guessing a Wear track, or asserting Play App Signing/Health/Data
-Safety/tester state would therefore be unsafe and was not done.
+The target API response intentionally conflates a package that has not been
+registered with an app to which this service account has not been granted
+access. The known-package probe rules out a broken/unlinked credential but
+cannot distinguish those two target-side conditions. It also provides no exact
+Wear internal track identifier. Uploading a mobile binary, guessing a Wear
+track, or asserting Play App Signing/Health/Data Safety/tester state would
+therefore be unsafe and was not done.
 
 ## External blocker and exact continuation
 

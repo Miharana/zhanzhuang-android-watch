@@ -38,11 +38,14 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 
 - [ ] Package/app registration is still unconfirmed. The specified Zhan Zhuang
   repository-external service-account file was absent; a separate external
-  candidate authenticated but returned `package-not-found-or-not-authorized`
-  for this package.
+  candidate can read a known Miharana Play app but returned
+  `package-not-found-or-not-authorized` for this package. The target is either
+  unregistered or not yet granted to that credential; the API response does
+  not distinguish those states.
 - [ ] Play Console bootstrap is blocked at the **Creating a developer account**
-  page. No account, app record, declaration, tester, listing, asset, or binary
-  was submitted in this task.
+  page in the only available Chrome session; no alternate in-app-browser
+  session was available. No account, app record, declaration, tester, listing,
+  asset, or binary was submitted in this task.
 - [ ] The exact Wear OS dedicated internal track is not known. It must be read
   from the authorized Console/API before a Wear AAB upload.
 - [ ] The signed candidate hashes and this attempt are recorded in
