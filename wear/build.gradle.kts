@@ -15,6 +15,13 @@ android {
         targetSdk = 36
         versionCode = 2_000_001
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
     }
 
     testOptions {

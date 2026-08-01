@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.zhanzhuang.timer.model.SessionConfig
@@ -27,7 +28,7 @@ class WearScreensTest {
     @Test fun setupShowsDefaults() {
         rule.setContent { ZhanZhuangWearTheme { SetupScreen(SessionConfig(), {}, {}) } }
 
-        rule.onNodeWithText("30 min").assertIsDisplayed()
+        rule.onAllNodesWithText("30 min")[0].assertIsDisplayed()
         rule.onNodeWithText("Every 10 min").assertIsDisplayed()
     }
 
