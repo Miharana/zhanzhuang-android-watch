@@ -17,7 +17,7 @@ Release identity:
 - [ ] Complete the Health apps declaration: optional informational heart-rate collection on Wear and optional write-only Health Connect mindfulness-session output (exercise-session fallback where mindfulness is unavailable) plus heart-rate output; no Health Connect reads.
 - [ ] Complete Data safety truthfully: no account, ads, analytics, cloud storage, or sale; local device/watch storage and optional Health Connect sharing only when the user grants it.
 - [ ] Complete the content rating questionnaire truthfully.
-- [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `dd372234-fa19-495c-adb1-54d279281a17`).
+- [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `5c67d0f4-9644-4e8e-8b05-8620351dc62f`, source commit `aee4218`).
 - [ ] Add the published privacy URL in Play Console and set a verified public developer contact route; this repository intentionally does not invent an email address.
 - [ ] Upload both bilingual listing locales, icon, feature graphic, phone screenshots, Wear screenshots, and changelogs.
 - [ ] Add internal testers and verify their access before uploading a binary.
@@ -40,7 +40,9 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 - [x] The public bilingual privacy-policy prerequisite is complete at
   <https://zhanzhuang-privacy.artlinx.workers.dev>. Remote readback returned
   HTTP 200 and confirmed the policy title, package scope, Health Connect
-  disclosure, Chinese copy, and absence of the development preview marker.
+  disclosure (mindfulness session, exercise fallback, and heart-rate samples),
+  Chinese copy, and absence of the development preview marker. Plain HTTP
+  redirects permanently to HTTPS and HTTPS responses include HSTS.
 - [ ] Package/app registration is still unconfirmed. The specified Zhan Zhuang
   repository-external service-account file was absent; a separate external
   candidate can read a known Miharana Play app but returned

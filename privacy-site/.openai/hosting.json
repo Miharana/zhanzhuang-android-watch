@@ -5,8 +5,8 @@
   "worker_name": "zhanzhuang-privacy",
   "production_url": "https://zhanzhuang-privacy.artlinx.workers.dev",
   "deployment_status": "deployed",
-  "current_version_id": "dd372234-fa19-495c-adb1-54d279281a17",
-  "source_commit": "ff0b381",
+  "current_version_id": "5c67d0f4-9644-4e8e-8b05-8620351dc62f",
+  "source_commit": "aee4218",
   "d1": null,
   "r2": null
 }

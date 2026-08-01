@@ -91,16 +91,20 @@ dashboard is available, the continuation is:
 - URL: <https://zhanzhuang-privacy.artlinx.workers.dev>
 - Published: 2026-08-01 UTC.
 - Cloudflare Worker version:
-  `dd372234-fa19-495c-adb1-54d279281a17`.
+  `5c67d0f4-9644-4e8e-8b05-8620351dc62f` (source commit `aee4218`).
 - Remote verification returned HTTP 200 and confirmed the English and Chinese
   policy title, package `app.zhanzhuang.timer`, optional Health Connect writing
   disclosure, and removal of the starter/development preview marker.
 - The policy site contains no account flow, form, analytics, advertising,
   database, or user-data storage. Its source is in `privacy-site/` and its
-  Urticad-inspired palette is covered by a rendered-site test. The production
-  dependency audit reports zero known vulnerabilities, and remote responses
-  include restrictive content, framing, referrer, content-type, and browser
-  capability security headers.
+  Urticad-inspired palette is covered by a rendered-site test. A fresh
+  `npm ci` and the complete `npm audit --audit-level=high` report zero known
+  vulnerabilities. Plain HTTP redirects permanently to HTTPS; HTTPS responses
+  include HSTS plus restrictive content, framing, referrer, content-type, and
+  browser capability security headers.
+- `.openai/hosting.json` records the non-secret Cloudflare account/project
+  identifier, Worker name, production URL, deployed version, successful state,
+  and source commit so later updates target the same public site.
 - The URL is ready to enter in Play Console. Console entry and the required
   verified public developer contact route remain blocked by the developer
   account bootstrap described above.
