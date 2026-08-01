@@ -33,3 +33,17 @@ Release identity:
 ## First-binary constraint
 
 Google Play may require a manual Play Console app/bootstrap before the first binary can be accepted. The Fastlane lanes prepare uploads but cannot create or verify that console setup on their own.
+
+## Task 12 verification attempt — 2026-08-01 UTC
+
+- [ ] Package/app registration is still unconfirmed. The specified Zhan Zhuang
+  repository-external service-account file was absent; a separate external
+  candidate authenticated but returned `package-not-found-or-not-authorized`
+  for this package.
+- [ ] Play Console bootstrap is blocked at the **Creating a developer account**
+  page. No account, app record, declaration, tester, listing, asset, or binary
+  was submitted in this task.
+- [ ] The exact Wear OS dedicated internal track is not known. It must be read
+  from the authorized Console/API before a Wear AAB upload.
+- [ ] The signed candidate hashes and this attempt are recorded in
+  `internal-release-evidence.md`. Production remains untouched.

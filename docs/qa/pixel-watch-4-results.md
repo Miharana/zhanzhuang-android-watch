@@ -20,6 +20,14 @@ Physical Pixel Watch 4 evidence is **blocked**: no physical watch was attached d
 
 A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear instrumentation suite successfully: 5 tests passed. The check covers Compose setup/active/end-confirmation contracts and is recorded in `wear-device-matrix.md`. It does **not** prove physical haptics, heart rate, foreground longevity, screen-off timing, reboot/process recovery, paired Data Layer delivery, or Pixel Watch 4 behavior.
 
+## Play-delivered build status
+
+Play-delivered testing is **blocked**. On 2026-08-01 the available Play Console
+session reached developer-account signup rather than a verified developer
+dashboard, so neither the mobile nor Wear AAB was uploaded to internal testing.
+There is no Play installer, Play App Signing, paired-device, Health Connect, or
+Data Layer result to report. This does not alter any physical-device row above.
+
 ## Operator evidence template
 
 For each physical row, append:
