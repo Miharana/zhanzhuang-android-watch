@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,9 +52,7 @@ fun SetupScreen(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        ScreenColumn(scrollState = scroll) {
-            Text(stringResource(R.string.brand_chinese), color = colors.primaryContainer)
-            Text(stringResource(R.string.standing_meditation), color = colors.onBackground)
+        ScreenColumn(scrollState = scroll, verticalSpacing = 0.dp) {
             Text(stringResource(R.string.duration), color = colors.primaryContainer)
             StepperRow(
                 value = stringResource(R.string.minutes_value, config.durationMinutes),
@@ -66,7 +67,8 @@ fun SetupScreen(
                 onDecrease = { onConfigChange(WearSetupState(config).withIntervalDelta(-1).config) },
                 onIncrease = { onConfigChange(WearSetupState(config).withIntervalDelta(1).config) },
             )
-            GoldAction(stringResource(R.string.start_session), onClick = onStart)
+            GoldAction(stringResource(R.string.start_session), onClick = onStart, modifier = Modifier.padding(horizontal = RoundActionHorizontalInset))
+            Spacer(Modifier.height(RoundActionBottomSafeSpace))
             Text(stringResource(R.string.shortcuts), color = colors.primaryContainer)
             listOf(15, 30, 45, 60, 90, 120, 180).forEach { minutes ->
                 SoilAction(stringResource(R.string.minutes_value, minutes), stringResource(R.string.set_duration, minutes), onClick = {

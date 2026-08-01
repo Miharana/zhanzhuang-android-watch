@@ -11,6 +11,29 @@ require_file() { [[ -s "$1" ]] || fail "missing required file: ${1#$repo_root/}"
 require_text() { grep -Fq -- "$2" "$1" || fail "${1#$repo_root/} must contain required release text"; }
 image_size() { sips -g pixelWidth -g pixelHeight "$1" 2>/dev/null | awk '/pixelWidth:/{w=$2} /pixelHeight:/{h=$2} END {if (w && h) print w "x" h}'; }
 image_has_alpha() { sips -g hasAlpha "$1" 2>/dev/null | awk '/hasAlpha:/{print $2}'; }
+image_property() { sips -g "$2" "$1" 2>/dev/null | awk -v property="$2" '$1 == property ":" { print $2; exit }'; }
+
+verify_play_icon() {
+    local icon=$1 format bits samples alpha
+    [[ $(image_size "$icon") == '512x512' ]] || fail 'Play icon must be 512x512'
+    format=$(image_property "$icon" format)
+    bits=$(image_property "$icon" bitsPerSample)
+    samples=$(image_property "$icon" samplesPerPixel)
+    alpha=$(image_has_alpha "$icon")
+    [[ "$format" == png && "$bits" == 8 && "$samples" == 4 && "$alpha" == yes ]] || fail 'Play icon must be 8-bit RGBA/32-bit PNG with alpha'
+    [[ $(stat -f '%z' "$icon") -le 1048576 ]] || fail 'Play icon exceeds 1 MiB'
+}
+
+verify_wear_screenshot() {
+    local screenshot=$1 dimensions width height
+    dimensions=$(image_size "$screenshot"); width=${dimensions%x*}; height=${dimensions#*x}
+    [[ "$width" == "$height" && "$width" -ge 384 && "$width" -le 3840 ]] || fail 'Wear screenshot must be square and between 384px and 3840px'
+    [[ $(image_has_alpha "$screenshot") == 'no' ]] || fail 'Wear screenshot must not have alpha'
+}
+
+if [[ "${VERIFY_RELEASE_LIB_ONLY:-}" == 1 ]]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 # Keep these checks first: do not perform Gradle or credential work with an incomplete key.
 : "${ZHANZHUANG_KEYSTORE_PATH:?missing ZHANZHUANG_KEYSTORE_PATH}"
@@ -53,8 +76,7 @@ for locale in en-US zh-CN; do
     icon="$locale_dir/images/icon.png"
     feature="$locale_dir/images/featureGraphic.png"
     require_file "$icon"; require_file "$feature"
-    [[ $(image_size "$icon") == '512x512' ]] || fail "$locale Play icon must be 512x512"
-    [[ $(stat -f '%z' "$icon") -le 1048576 ]] || fail "$locale Play icon exceeds 1 MiB"
+    verify_play_icon "$icon"
     [[ $(image_size "$feature") == '1024x500' ]] || fail "$locale feature graphic must be 1024x500"
     [[ $(image_has_alpha "$feature") == 'no' ]] || fail "$locale feature graphic must not have alpha"
 
@@ -72,9 +94,7 @@ for locale in en-US zh-CN; do
         [[ $(image_has_alpha "$screenshot") == 'no' ]] || fail "$locale phone screenshot must not have alpha"
     done < <(find "$phone_dir" -maxdepth 1 -type f -iname '*.png' | sort)
     while IFS= read -r screenshot; do
-        dimensions=$(image_size "$screenshot"); width=${dimensions%x*}; height=${dimensions#*x}
-        [[ "$width" == "$height" && "$width" -ge 384 ]] || fail "$locale Wear screenshot must be square and at least 384px"
-        [[ $(image_has_alpha "$screenshot") == 'no' ]] || fail "$locale Wear screenshot must not have alpha"
+        verify_wear_screenshot "$screenshot"
     done < <(find "$wear_dir" -maxdepth 1 -type f -iname '*.png' | sort)
 done
 

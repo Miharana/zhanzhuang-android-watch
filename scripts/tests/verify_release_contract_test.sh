@@ -36,6 +36,38 @@ require_text "$verifier" 'app.zhanzhuang.timer'
 require_text "$verifier" '"$height" -le $((2 * width))'
 require_text "$verifier" 'packaged_res/release/packageReleaseResources/values-zh-rCN/values-zh-rCN.xml'
 
+# Image validators are loaded as a library so deliberately invalid, temporary fixtures
+# exercise the same checks used by the release gate.
+set +e
+VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon /dev/null' _ "$verifier" >"${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out" 2>&1
+image_status=$?
+set -e
+[[ $image_status -ne 0 ]] || fail 'invalid icon fixture must be rejected by the release image validator'
+grep -Fq 'Play icon' "${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out" || fail 'icon fixture must reach the release image validator'
+rm -f "${TMPDIR:-/tmp}/zhan-zhuang-image-contract.out"
+
+fixture_dir=$(mktemp -d "${TMPDIR:-/tmp}/zhan-zhuang-image-fixtures.XXXXXX")
+trap 'rm -rf "$fixture_dir"' EXIT
+VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon "$2"; verify_wear_screenshot "$3"' _ \
+    "$verifier" \
+    "$repo_root/fastlane/metadata/android/en-US/images/icon.png" \
+    "$repo_root/fastlane/metadata/android/en-US/images/wearScreenshots/01.png"
+sips -z 512 512 "$repo_root/fastlane/metadata/android/en-US/images/featureGraphic.png" --out "$fixture_dir/rgb-icon.png" >/dev/null
+set +e
+VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_play_icon "$2"' _ "$verifier" "$fixture_dir/rgb-icon.png" >"$fixture_dir/icon.out" 2>&1
+image_status=$?
+set -e
+[[ $image_status -ne 0 ]] || fail 'RGB icon fixture must be rejected'
+grep -Fq '8-bit RGBA/32-bit PNG with alpha' "$fixture_dir/icon.out" || fail 'RGB icon fixture must fail the RGBA contract'
+
+sips -z 4000 4000 "$repo_root/fastlane/metadata/android/en-US/images/wearScreenshots/01.png" --out "$fixture_dir/oversize-wear.png" >/dev/null
+set +e
+VERIFY_RELEASE_LIB_ONLY=1 bash -c 'source "$1"; verify_wear_screenshot "$2"' _ "$verifier" "$fixture_dir/oversize-wear.png" >"$fixture_dir/wear.out" 2>&1
+image_status=$?
+set -e
+[[ $image_status -ne 0 ]] || fail 'oversize Wear fixture must be rejected'
+grep -Fq 'between 384px and 3840px' "$fixture_dir/wear.out" || fail 'oversize Wear fixture must fail the max-dimension contract'
+
 # Cross multiplication rejects 1080x2400 (2.22:1) without integer-division truncation.
 phone_width=1080
 phone_height=2400

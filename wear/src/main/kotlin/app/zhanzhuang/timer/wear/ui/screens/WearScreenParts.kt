@@ -30,10 +30,40 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
 
-internal val RoundScreenPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
+internal val RoundScreenHorizontalPadding = 18.dp
+internal val RoundActionHorizontalInset = 32.dp
+internal val RoundActionBottomSafeSpace = 64.dp
+internal val RoundScreenPadding = PaddingValues(horizontal = RoundScreenHorizontalPadding, vertical = 16.dp)
+
+/** Geometry behind the 454px round Wear target used for release screenshots and interaction layout. */
+internal object RoundScreenGeometry {
+    data class Rect(val left: Int, val top: Int, val right: Int, val bottom: Int)
+
+    fun actionBounds(diameterPx: Int, density: Float, topPx: Int): Rect {
+        val horizontalInset = ((RoundScreenHorizontalPadding.value + RoundActionHorizontalInset.value) * density).roundToInt()
+        val actionHeight = (48f * density).roundToInt()
+        return Rect(horizontalInset, topPx, diameterPx - horizontalInset, topPx + actionHeight)
+    }
+
+    fun rectFitsCircle(rect: Rect, diameterPx: Int): Boolean {
+        val center = diameterPx / 2.0
+        val radiusSquared = center * center
+        return listOf(
+            rect.left.toDouble() to rect.top.toDouble(),
+            rect.left.toDouble() to rect.bottom.toDouble(),
+            rect.right.toDouble() to rect.top.toDouble(),
+            rect.right.toDouble() to rect.bottom.toDouble(),
+        ).all { (x, y) ->
+            val dx = x - center
+            val dy = y - center
+            dx * dx + dy * dy <= radiusSquared
+        }
+    }
+}
 
 @Composable
 internal fun ScreenColumn(
