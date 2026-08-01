@@ -76,7 +76,7 @@ class WearSessionService : Service() {
         val commandGeneration = generation.incrementAndGet()
         // This satisfies the FGS deadline; the recovery-only notification has no OngoingActivity extension.
         startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
-        requests.trySend(ServiceRequest.Command(command, intent?.getStringExtra(EXTRA_SESSION_ID), startId, commandGeneration))
+        requests.trySend(ServiceRequest.Command(command, intent?.getStringExtra(EXTRA_SESSION_ID), intent?.getStringExtra(EXTRA_REQUEST_ID), startId, commandGeneration))
         return START_STICKY
     }
 
@@ -114,8 +114,18 @@ class WearSessionService : Service() {
                 ServiceCommandResult.ACTIVE -> {
                     publishForeground(request.generation)
                     startTicker(request.startId, request.generation)
+                    app.zhanzhuang.timer.wear.sync.WearServiceCommandGateway.complete(
+                        request.requestId,
+                        controller.state.value.record?.takeIf { request.expectedSessionId == null || it.id == request.expectedSessionId },
+                    )
                 }
-                ServiceCommandResult.STOP -> stopIfCurrent(request.startId, request.generation)
+                ServiceCommandResult.STOP -> {
+                    app.zhanzhuang.timer.wear.sync.WearServiceCommandGateway.complete(
+                        request.requestId,
+                        controller.state.value.record?.takeIf { request.expectedSessionId == null || it.id == request.expectedSessionId },
+                    )
+                    stopIfCurrent(request.startId, request.generation)
+                }
                 ServiceCommandResult.REJECTED -> {
                     // A stale remote command must never tear down a different valid session.
                     if (controller.state.value.record?.status in ACTIVE_STATUSES) {
@@ -124,6 +134,7 @@ class WearSessionService : Service() {
                     } else {
                         stopIfCurrent(request.startId, request.generation)
                     }
+                    app.zhanzhuang.timer.wear.sync.WearServiceCommandGateway.complete(request.requestId, null)
                 }
             }
             is ServiceRequest.Tick -> if (request.generation == generation.get()) {
@@ -140,7 +151,7 @@ class WearSessionService : Service() {
     }
 
     private sealed interface ServiceRequest {
-        data class Command(val command: WearSessionService.Command, val expectedSessionId: String?, val startId: Int, val generation: Long) : ServiceRequest
+        data class Command(val command: WearSessionService.Command, val expectedSessionId: String?, val requestId: String?, val startId: Int, val generation: Long) : ServiceRequest
         data class Tick(val startId: Int, val generation: Long) : ServiceRequest
     }
 
@@ -168,6 +179,7 @@ class WearSessionService : Service() {
         const val ACTION_RESUME = "app.zhanzhuang.timer.wear.session.RESUME"
         const val ACTION_STATUS = "app.zhanzhuang.timer.wear.session.STATUS"
         const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_REQUEST_ID = "request_id"
         const val EXTRA_DURATION_MINUTES = "duration_minutes"
         const val EXTRA_INTERVAL_MINUTES = "interval_minutes"
         private const val TICK_MS = 1_000L

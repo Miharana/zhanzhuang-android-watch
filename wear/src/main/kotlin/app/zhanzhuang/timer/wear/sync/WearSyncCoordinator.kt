@@ -26,7 +26,7 @@ interface WearCompletionOutbox {
 }
 
 interface WearSyncController {
-    suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord
+    suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord?
     suspend fun current(): SessionRecord?
     suspend fun session(sessionId: String): SessionRecord?
     suspend fun pauseFromRemote(sessionId: String): SessionRecord?

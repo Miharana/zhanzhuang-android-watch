@@ -446,6 +446,25 @@ class WearSessionControllerTest {
     }
 
     @Test
+    fun commandActorRejectsStartForAnotherSessionWithoutChangingTheActiveSession() = runTest {
+        val store = RecordingStore()
+        val snapshots = RecordingSnapshots().also {
+            it.save(WearSessionSnapshot(record(SessionStatus.RUNNING), "boot", runningSinceBootMs = 0))
+        }
+        val processor = WearSessionCommandProcessor(controller(store, snapshots))
+
+        val result = processor.process(
+            WearSessionService.Command.Start(SessionConfig(15, 5), "session-a"),
+            bootId = "boot",
+            expectedSessionId = "session-a",
+        )
+
+        assertEquals(ServiceCommandResult.REJECTED, result)
+        assertEquals("s1", store.latest()?.id)
+        assertEquals(SessionStatus.RUNNING, store.latest()?.status)
+    }
+
+    @Test
     fun commandActorRecoversBeforeFinish() = runTest {
         val store = RecordingStore()
         val snapshots = RecordingSnapshots().also {

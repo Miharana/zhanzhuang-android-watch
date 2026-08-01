@@ -6,31 +6,22 @@ import android.os.Build
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
-import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.session.WearSessionService
-import kotlinx.coroutines.delay
 
 /** Routes remote commands through the existing health foreground service. */
 class WearServiceSyncController(
     private val context: Context,
     private val repository: WearSessionRepository,
-    private val nowEpochMillis: () -> Long = { System.currentTimeMillis() },
 ) : WearSyncController {
-    override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord {
-        val existing = repository.get(sessionId)
-        if (existing != null) return existing
-        startForeground(WearSessionService.startIntent(context, config, sessionId))
-        // The service immediately persists STARTING/RUNNING; this state also
-        // gives the phone a strictly newer ownership acknowledgement.
-        return SessionRecord(
-            id = sessionId,
-            revision = revision + 1,
-            config = config,
-            status = SessionStatus.STARTING,
-            owner = SessionOwner.WEAR,
-            startEpochMillis = nowEpochMillis(),
-        )
+    override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord? {
+        val active = repository.activeSession()
+        if (active != null && active.id != sessionId) return null
+        return WearServiceCommandGateway.dispatch { requestId ->
+            startForeground(WearSessionService.startIntent(context, config, sessionId)
+                .putExtra(WearSessionService.EXTRA_REQUEST_ID, requestId)
+                .putExtra(WearSessionService.EXTRA_SESSION_ID, sessionId))
+        }?.takeIf { it.id == sessionId && it.owner == SessionOwner.WEAR }
     }
 
     override suspend fun current(): SessionRecord? = repository.activeSession()
@@ -49,23 +40,16 @@ class WearServiceSyncController(
 
     private suspend fun command(sessionId: String, action: String): SessionRecord? {
         val current = repository.activeSession()?.takeIf { it.id == sessionId } ?: return null
-        startForeground(Intent(context, WearSessionService::class.java)
-            .setAction(action)
-            .putExtra(WearSessionService.EXTRA_SESSION_ID, sessionId))
-        repeat(MAX_STATE_POLLS) {
-            delay(STATE_POLL_MS)
-            val updated = repository.get(sessionId)
-            if (updated != null && updated.revision > current.revision) return updated
-        }
-        return null
+        return WearServiceCommandGateway.dispatch { requestId ->
+            startForeground(Intent(context, WearSessionService::class.java)
+                .setAction(action)
+                .putExtra(WearSessionService.EXTRA_SESSION_ID, sessionId)
+                .putExtra(WearSessionService.EXTRA_REQUEST_ID, requestId))
+        }?.takeIf { it.id == sessionId && it.revision > current.revision }
     }
 
     private fun startForeground(intent: Intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }
 
-    private companion object {
-        const val MAX_STATE_POLLS = 10
-        const val STATE_POLL_MS = 50L
-    }
 }
