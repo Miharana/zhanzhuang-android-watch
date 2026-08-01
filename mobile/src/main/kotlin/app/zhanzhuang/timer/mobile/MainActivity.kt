@@ -9,6 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -86,7 +89,11 @@ class MainActivity : ComponentActivity() {
             if (state.training.session?.status in setOf(app.zhanzhuang.timer.model.SessionStatus.RUNNING, app.zhanzhuang.timer.model.SessionStatus.COMPLETED)) sparkle = true
         }
         LaunchedEffect(Unit) { model.permissionRequests.collect { requestHealthPermissions.launch(it) } }
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+        ) {
             when (state.destination) {
                 MobileDestination.TRAINING -> TrainingScreen(
                     state = state.training,

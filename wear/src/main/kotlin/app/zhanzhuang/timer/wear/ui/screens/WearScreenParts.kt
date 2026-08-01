@@ -38,6 +38,7 @@ internal val RoundScreenPadding = PaddingValues(horizontal = 18.dp, vertical = 1
 @Composable
 internal fun ScreenColumn(
     scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    verticalSpacing: androidx.compose.ui.unit.Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -47,7 +48,7 @@ internal fun ScreenColumn(
             .verticalScroll(scrollState)
             .padding(RoundScreenPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         content = content,
     )
 }

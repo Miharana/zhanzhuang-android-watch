@@ -66,13 +66,13 @@ fun SetupScreen(
                 onDecrease = { onConfigChange(WearSetupState(config).withIntervalDelta(-1).config) },
                 onIncrease = { onConfigChange(WearSetupState(config).withIntervalDelta(1).config) },
             )
+            GoldAction(stringResource(R.string.start_session), onClick = onStart)
             Text(stringResource(R.string.shortcuts), color = colors.primaryContainer)
             listOf(15, 30, 45, 60, 90, 120, 180).forEach { minutes ->
                 SoilAction(stringResource(R.string.minutes_value, minutes), stringResource(R.string.set_duration, minutes), onClick = {
                     onConfigChange(WearSetupState(config).withDuration(minutes).config)
                 })
             }
-            GoldAction(stringResource(R.string.start_session), onClick = onStart)
         }
     }
 }

@@ -2,9 +2,13 @@ package app.zhanzhuang.timer.mobile.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +40,12 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var legalNotice by rememberSaveable { mutableStateOf<String?>(null) }
-    Column(modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         androidx.compose.material3.TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.back)) }
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
         Text(stringResource(R.string.defaults), style = MaterialTheme.typography.titleLarge)
@@ -51,6 +60,7 @@ fun SettingsScreen(
         Text(stringResource(R.string.privacy), style = MaterialTheme.typography.titleLarge)
         Text(stringResource(R.string.privacy_summary))
         OutlinedButton(onClick = { legalNotice = "privacy" }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.privacy_policy)) }
+        Spacer(Modifier.height(64.dp))
         OutlinedButton(onClick = { legalNotice = "licenses" }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.open_source_licenses)) }
     }
     legalNotice?.let { notice ->

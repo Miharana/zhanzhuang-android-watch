@@ -24,6 +24,22 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val releaseKeyPath = providers.environmentVariable("ZHANZHUANG_KEYSTORE_PATH")
+            storeFile = releaseKeyPath.orNull?.let(::file)
+            storePassword = providers.environmentVariable("ZHANZHUANG_STORE_PASSWORD").orNull
+            keyAlias = providers.environmentVariable("ZHANZHUANG_KEY_ALIAS").orNull
+            keyPassword = providers.environmentVariable("ZHANZHUANG_KEY_PASSWORD").orNull
+        }
+    }
+
+    buildTypes.named("release") {
+        signingConfig = signingConfigs.getByName("release")
+        // Keep the first Play candidate debuggable until a separately verified R8 policy exists.
+        isMinifyEnabled = false
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
