@@ -26,6 +26,10 @@ interface MobileHaptics {
     fun completion()
 }
 
+fun interface HealthSyncScheduler {
+    fun enqueue(record: SessionRecord): Boolean
+}
+
 data class MobileSessionUiState(
     val session: SessionRecord? = null,
     val activeElapsedMs: Long = 0,
@@ -47,6 +51,7 @@ class DefaultMobileSessionController(
     private val elapsedClock: ElapsedClock,
     private val wallClock: WallClock,
     private val haptics: MobileHaptics,
+    private val healthSyncScheduler: HealthSyncScheduler = HealthSyncScheduler { false },
 ) : MobileSessionController {
     private val mutex = Mutex()
     private val mutableState = MutableStateFlow(MobileSessionUiState())
@@ -193,7 +198,19 @@ class DefaultMobileSessionController(
         lastPersistedActiveMs = currentSnapshot.activeElapsedMs
         repository.upsert(finished)
         mutableState.value = uiState(finished, currentSnapshot)
-        if (!cancelled) haptics.completion()
+        if (!cancelled) {
+            val queued = runCatching { healthSyncScheduler.enqueue(finished) }.getOrDefault(false)
+            if (queued) {
+                val pendingExport = finished.copy(
+                    revision = finished.revision + 1,
+                    healthConnectState = app.zhanzhuang.timer.model.SyncState.PENDING,
+                )
+                record = pendingExport
+                repository.upsert(pendingExport)
+                mutableState.value = uiState(pendingExport, currentSnapshot)
+            }
+            haptics.completion()
+        }
     }
 
     private suspend fun persist(updated: SessionRecord, snapshot: ClockSnapshot) {

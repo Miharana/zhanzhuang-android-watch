@@ -14,6 +14,7 @@ import android.os.Vibrator
 import androidx.room.Room
 import app.zhanzhuang.timer.mobile.data.MobileDatabase
 import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
+import app.zhanzhuang.timer.mobile.health.HealthSyncWorker
 import app.zhanzhuang.timer.model.SessionConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
@@ -144,6 +145,9 @@ open class MobileSessionService : Service() {
                 elapsedClock = ElapsedClock { SystemClock.elapsedRealtime() },
                 wallClock = WallClock { System.currentTimeMillis() },
                 haptics = AndroidMobileHaptics(context.getSystemService(Vibrator::class.java)),
+                healthSyncScheduler = HealthSyncScheduler { record ->
+                    HealthSyncWorker.enqueue(context, record)
+                },
             )
         },
     )

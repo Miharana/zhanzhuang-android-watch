@@ -3,6 +3,7 @@ package app.zhanzhuang.timer.mobile.session
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.SyncState
 import app.zhanzhuang.timer.mobile.data.MobileRuntimeSnapshot
 import app.zhanzhuang.timer.mobile.data.SessionRepository
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +31,45 @@ class MobileSessionControllerTest {
 
         assertEquals(1, haptics.completionCount)
         assertEquals(SessionStatus.COMPLETED, repository.activeOrLast()!!.status)
+    }
+
+    @Test
+    fun completionEnqueuesHealthSyncWithoutBlockingLocalCompletion() = runTest {
+        val healthSync = RecordingHealthSyncScheduler()
+        val exportingController = DefaultMobileSessionController(
+            repository = InMemorySessionRepository(),
+            elapsedClock = elapsed,
+            wallClock = wall,
+            haptics = haptics,
+            healthSyncScheduler = healthSync,
+        )
+        exportingController.start(SessionConfig(15, 5))
+        elapsed.advanceBy(900_000)
+
+        exportingController.tick()
+
+        assertEquals(SessionStatus.COMPLETED, exportingController.state.value.session!!.status)
+        assertEquals(SyncState.PENDING, exportingController.state.value.session!!.healthConnectState)
+        assertEquals(listOf("COMPLETED"), healthSync.statuses)
+    }
+
+    @Test
+    fun healthSyncEnqueueFailureDoesNotBlockLocalCompletion() = runTest {
+        val failingScheduler = HealthSyncScheduler { error("WorkManager unavailable") }
+        val exportingController = DefaultMobileSessionController(
+            repository = InMemorySessionRepository(),
+            elapsedClock = elapsed,
+            wallClock = wall,
+            haptics = haptics,
+            healthSyncScheduler = failingScheduler,
+        )
+        exportingController.start(SessionConfig(15, 5))
+        elapsed.advanceBy(900_000)
+
+        exportingController.tick()
+
+        assertEquals(SessionStatus.COMPLETED, exportingController.state.value.session!!.status)
+        assertEquals(1, haptics.completionCount)
     }
 
     @Test
@@ -123,6 +163,15 @@ class MobileSessionControllerTest {
         override fun pauseResume() = Unit
         override fun completion() {
             completionCount += 1
+        }
+    }
+
+    private class RecordingHealthSyncScheduler : HealthSyncScheduler {
+        val statuses = mutableListOf<String>()
+
+        override fun enqueue(record: SessionRecord): Boolean {
+            statuses += record.status.name
+            return true
         }
     }
 
