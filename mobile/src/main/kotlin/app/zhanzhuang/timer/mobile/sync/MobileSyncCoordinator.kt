@@ -62,6 +62,20 @@ class MobileSyncCoordinator(
         return record
     }
 
+    /** Sends a command to a watch-owned session without manufacturing a local timer state. */
+    suspend fun requestPause(sessionId: String): Boolean = requestRemoteCommand(sessionId, SyncPayload.Pause)
+
+    suspend fun requestResume(sessionId: String): Boolean = requestRemoteCommand(sessionId, SyncPayload.Resume)
+
+    suspend fun requestFinish(sessionId: String, cancelled: Boolean): Boolean =
+        requestRemoteCommand(sessionId, SyncPayload.Finish(cancelled))
+
+    private suspend fun requestRemoteCommand(sessionId: String, payload: SyncPayload): Boolean = mutex.withLock {
+        val current = controller.session(sessionId) ?: return false
+        if (current.owner != SessionOwner.WEAR || current.status !in ACTIVE_STATUSES) return false
+        transport.sendMessage(envelope(current, payload))
+    }
+
     suspend fun receiveCommand(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
         if (!isValidUnseenEnvelope(envelope)) return false
         val handled = when (val payload = envelope.payload) {

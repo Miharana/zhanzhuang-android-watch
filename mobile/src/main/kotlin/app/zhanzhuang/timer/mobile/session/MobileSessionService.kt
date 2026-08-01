@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.os.VibrationEffect
@@ -24,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -48,6 +48,7 @@ open class MobileSessionService : Service() {
         val dependencies = testDependencies ?: defaultDependencies()
         serviceScope = CoroutineScope(SupervisorJob() + dependencies.dispatcher)
         val controller = dependencies.controllerFactory(applicationContext)
+        serviceScope.launch { controller.state.collect(MobileSessionUiBridge::publish) }
         serviceScope.launch {
             try {
                 HealthSyncWorker.reconcile(applicationContext)
@@ -203,8 +204,14 @@ open class MobileSessionService : Service() {
                 .putExtra(EXTRA_DURATION_MINUTES, config.durationMinutes)
                 .putExtra(EXTRA_INTERVAL_MINUTES, config.intervalMinutes)
                 .putExtra(EXTRA_SESSION_ID, sessionId)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-            else context.startService(intent)
+            context.startForegroundService(intent)
+        }
+
+        fun command(context: Context, action: String, cancelled: Boolean = false) {
+            val intent = Intent(context, MobileSessionService::class.java)
+                .setAction(action)
+                .putExtra(EXTRA_CANCELLED, cancelled)
+            context.startForegroundService(intent)
         }
     }
 }

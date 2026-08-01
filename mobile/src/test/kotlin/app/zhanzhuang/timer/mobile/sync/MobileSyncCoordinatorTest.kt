@@ -273,6 +273,19 @@ class MobileSyncCoordinatorTest {
         assertTrue(transport.envelopes.isEmpty())
     }
 
+    @Test
+    fun phoneRoutesWatchOwnedPauseToDataLayerWithoutCreatingPhoneTimer() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+
+        assertTrue(coordinator.requestPause("session-1"))
+
+        assertEquals("PAUSE", transport.sentPayloadNames.single())
+        assertEquals(SessionOwner.WEAR, controller.owner())
+        assertEquals(SessionStatus.RUNNING, controller.current()!!.status)
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
