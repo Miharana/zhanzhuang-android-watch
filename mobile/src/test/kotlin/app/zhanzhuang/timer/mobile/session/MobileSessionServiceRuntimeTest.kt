@@ -47,8 +47,9 @@ class MobileSessionServiceRuntimeTest {
         override fun removeForegroundNotification() {
             removeForegroundCount += 1
         }
-        override fun stopSelf() {
+        override fun stopService(startId: Int?): Boolean {
             stopSelfCount += 1
+            return true
         }
     }
 }

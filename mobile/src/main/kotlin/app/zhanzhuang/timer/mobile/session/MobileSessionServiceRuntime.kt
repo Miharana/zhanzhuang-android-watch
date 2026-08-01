@@ -7,51 +7,50 @@ interface MobileForegroundServiceHost {
     fun startTicker()
     fun stopTicker()
     fun removeForegroundNotification()
-    fun stopSelf()
+    fun stopService(startId: Int?): Boolean
 }
 
 class MobileSessionServiceRuntime(
     private val controller: MobileSessionController,
     private val host: MobileForegroundServiceHost,
 ) {
-    suspend fun recover(tearDownWhenInactive: Boolean = true): Boolean {
+    suspend fun recover(tearDownWhenInactive: Boolean = true, startId: Int? = null): Boolean {
         val recovered = controller.recover()
-        if (recovered || tearDownWhenInactive) synchronizeService()
+        if (recovered || tearDownWhenInactive) synchronizeService(startId)
         return recovered
     }
 
-    suspend fun start(config: SessionConfig) {
+    suspend fun start(config: SessionConfig, startId: Int? = null) {
         controller.start(config)
-        synchronizeService()
+        synchronizeService(startId)
     }
 
-    suspend fun pause() {
+    suspend fun pause(startId: Int? = null) {
         controller.pause()
-        synchronizeService()
+        synchronizeService(startId)
     }
 
-    suspend fun resume() {
+    suspend fun resume(startId: Int? = null) {
         controller.resume()
-        synchronizeService()
+        synchronizeService(startId)
     }
 
-    suspend fun finish(cancelled: Boolean) {
+    suspend fun finish(cancelled: Boolean, startId: Int? = null) {
         controller.finish(cancelled)
-        synchronizeService()
+        synchronizeService(startId)
     }
 
-    suspend fun tick() {
+    suspend fun tick(startId: Int? = null) {
         controller.tick()
-        synchronizeService()
+        synchronizeService(startId)
     }
 
-    private fun synchronizeService() {
+    private fun synchronizeService(startId: Int?) {
         if (controller.state.value.session?.status in ACTIVE_STATUSES) {
             host.startTicker()
         } else {
             host.stopTicker()
-            host.removeForegroundNotification()
-            host.stopSelf()
+            if (host.stopService(startId)) host.removeForegroundNotification()
         }
     }
 

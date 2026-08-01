@@ -33,11 +33,12 @@ internal data class MobileSessionServiceDependencies(
     val hostFactory: ((MobileSessionService) -> MobileForegroundServiceHost)? = null,
 )
 
-class MobileSessionService : Service() {
+open class MobileSessionService : Service() {
     private lateinit var serviceScope: CoroutineScope
     private lateinit var runtime: MobileSessionServiceRuntime
     private val actionMutex = Mutex()
     private var tickJob: Job? = null
+    private var latestStartId = 0
     internal var lastActionJob: Job? = null
 
     override fun onCreate() {
@@ -54,33 +55,35 @@ class MobileSessionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = maxOf(latestStartId, startId)
         lastActionJob = serviceScope.launch {
             actionMutex.withLock {
                 when (intent?.action) {
                     ACTION_START -> {
-                        if (!runtime.recover(tearDownWhenInactive = false)) {
+                        if (!runtime.recover(tearDownWhenInactive = false, startId = startId)) {
                             runtime.start(
                                 SessionConfig(
                                     intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
                                     intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
                                 ),
+                                startId,
                             )
                         }
                     }
                     ACTION_PAUSE -> {
-                        runtime.recover()
-                        runtime.pause()
+                        runtime.recover(startId = startId)
+                        runtime.pause(startId)
                     }
                     ACTION_RESUME -> {
-                        runtime.recover()
-                        runtime.resume()
+                        runtime.recover(startId = startId)
+                        runtime.resume(startId)
                     }
                     ACTION_FINISH -> {
-                        runtime.recover()
-                        runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false))
+                        runtime.recover(startId = startId)
+                        runtime.finish(intent.getBooleanExtra(EXTRA_CANCELLED, false), startId)
                     }
-                    null -> runtime.recover()
-                    else -> runtime.recover()
+                    null -> runtime.recover(startId = startId)
+                    else -> runtime.recover(startId = startId)
                 }
             }
         }
@@ -103,7 +106,7 @@ class MobileSessionService : Service() {
                 if (tickJob?.isActive == true) return
                 tickJob = serviceScope.launch {
                     while (isActive) {
-                        runtime.tick()
+                        runtime.tick(latestStartId)
                         delay(TICK_INTERVAL_MS)
                     }
                 }
@@ -118,10 +121,17 @@ class MobileSessionService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             }
 
-            override fun stopSelf() {
-                this@MobileSessionService.stopSelf()
+            override fun stopService(startId: Int?): Boolean {
+                return if (startId == null) {
+                    this@MobileSessionService.stopSelf()
+                    true
+                } else {
+                    requestStop(startId)
+                }
             }
     }
+
+    protected open fun requestStop(startId: Int): Boolean = stopSelfResult(startId)
 
     private fun defaultDependencies() = MobileSessionServiceDependencies(
         controllerFactory = { context ->
