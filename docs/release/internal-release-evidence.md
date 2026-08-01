@@ -86,6 +86,25 @@ dashboard is available, the continuation is:
    Play-delivered paired-device QA. Physical Pixel Watch 4 evidence remains
    blocked until actually observed.
 
+## Public privacy-policy publication
+
+- URL: <https://zhanzhuang-privacy.artlinx.workers.dev>
+- Published: 2026-08-01 UTC.
+- Cloudflare Worker version:
+  `dd372234-fa19-495c-adb1-54d279281a17`.
+- Remote verification returned HTTP 200 and confirmed the English and Chinese
+  policy title, package `app.zhanzhuang.timer`, optional Health Connect writing
+  disclosure, and removal of the starter/development preview marker.
+- The policy site contains no account flow, form, analytics, advertising,
+  database, or user-data storage. Its source is in `privacy-site/` and its
+  Urticad-inspired palette is covered by a rendered-site test. The production
+  dependency audit reports zero known vulnerabilities, and remote responses
+  include restrictive content, framing, referrer, content-type, and browser
+  capability security headers.
+- The URL is ready to enter in Play Console. Console entry and the required
+  verified public developer contact route remain blocked by the developer
+  account bootstrap described above.
+
 ## Current remote truth
 
 | Surface | Track | Version code | State |

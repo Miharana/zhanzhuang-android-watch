@@ -24,7 +24,7 @@ The app requests only the permissions needed for its timer, notifications/haptic
 
 ## Contact
 
-There is no independently verified support mailbox for this first release. For a privacy question, use the contact method shown in the app's Google Play listing. The Play Console privacy-policy URL and public contact route must be completed before publication.
+For a privacy question, use the public contact method shown in the app's Google Play listing. The published privacy-policy URL is <https://zhanzhuang-privacy.artlinx.workers.dev>. A verified public developer contact route must still be set in Play Console before publication; this repository intentionally does not invent one.
 
 ## Changes
 

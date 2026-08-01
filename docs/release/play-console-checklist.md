@@ -17,7 +17,8 @@ Release identity:
 - [ ] Complete the Health apps declaration: optional informational heart-rate collection on Wear and optional write-only Health Connect exercise/heart-rate output; no Health Connect reads.
 - [ ] Complete Data safety truthfully: no account, ads, analytics, cloud storage, or sale; local device/watch storage and optional Health Connect sharing only when the user grants it.
 - [ ] Complete the content rating questionnaire truthfully.
-- [ ] Publish `docs/privacy-policy.html` at a public HTTPS URL and add that URL in Play Console. Also set a verified public developer contact route; this repository intentionally does not invent an email address.
+- [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `dd372234-fa19-495c-adb1-54d279281a17`).
+- [ ] Add the published privacy URL in Play Console and set a verified public developer contact route; this repository intentionally does not invent an email address.
 - [ ] Upload both bilingual listing locales, icon, feature graphic, phone screenshots, Wear screenshots, and changelogs.
 - [ ] Add internal testers and verify their access before uploading a binary.
 - [ ] Opt the app into Wear OS distribution and confirm the exact dedicated Wear form-factor track identifier in Play Console/API. Do not infer or guess that track.
@@ -36,6 +37,10 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 
 ## Task 12 verification attempt — 2026-08-01 UTC
 
+- [x] The public bilingual privacy-policy prerequisite is complete at
+  <https://zhanzhuang-privacy.artlinx.workers.dev>. Remote readback returned
+  HTTP 200 and confirmed the policy title, package scope, Health Connect
+  disclosure, Chinese copy, and absence of the development preview marker.
 - [ ] Package/app registration is still unconfirmed. The specified Zhan Zhuang
   repository-external service-account file was absent; a separate external
   candidate can read a known Miharana Play app but returned
