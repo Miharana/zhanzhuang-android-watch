@@ -25,29 +25,41 @@ Date (UTC): 2026-08-01T08:16:32Z
   already-approved Fastlane setup; it is committed with this evidence so the
   release tooling is reproducible.
 
-## Remote read-only probe
+## Remote transient-edit probes (uncommitted)
 
 1. The specified repository-external service-account path
    `/Users/pema/.config/zhanzhuang/google-play/fastlane-supply.json` was not
    present.
 2. A different repository-external candidate credential authenticated to the
-   Android Publisher API without exposing credential contents. A transient,
-   uncommitted edit probe for `app.zhanzhuang.timer` returned
-   `package-not-found-or-not-authorized`; no AAB, metadata, image, or release
-   was committed. The edit was discarded in the probe cleanup path.
+   Android Publisher API without exposing credential contents. Its target-track
+   query created a **transient remote Android Publisher edit** for
+   `app.zhanzhuang.timer`, because the Android Publisher tracks endpoint is
+   edit-scoped. It returned `package-not-found-or-not-authorized`. No AAB,
+   metadata, image, or release payload was uploaded; `edit.commit` was never
+   called, and the probe cleanup path invoked `delete_edit`.
 3. The candidate credential was then tested against the known existing
    Miharana Android package `com.urticad.miharana`. It read its `internal` and
    `production` track releases successfully (both report code `11`,
-   `completed`) through a transient uncommitted edit that was discarded. The
-   credential is therefore connected to Google Play and has access to that
-   known app; it does **not** establish access to `app.zhanzhuang.timer`.
-4. Browser-session audit: the only browser surface made available by this
-   environment was **Chrome**; no in-app-browser session was available to try.
-   Its Play Console route reached `https://play.google.com/console/signup`
-   with the title **Creating a developer account**, rather than an existing
-   verified developer dashboard. No Console form was submitted.
+   `completed`) through a second **transient remote Android Publisher edit**.
+   Again, no payload was uploaded, `edit.commit` was never called, and the
+   probe cleanup path invoked `delete_edit`. The credential is therefore
+   connected to Google Play and has access to that known app; it does **not**
+   establish access to `app.zhanzhuang.timer`.
+4. Browser-session audit: following the Browser skill's target-URL selection
+   path, this task initialized the browser runtime and called
+   `agent.browsers.getForUrl("https://play.google.com/console/")`; it selected
+   **Chrome**. The task then used `agent.browsers.list()` for a non-interacting
+   availability discovery, which returned exactly one surface of type
+   `extension` named Chrome and no surface of type `iab`. At that time there
+   was therefore no alternate browser surface available to try. Chrome's Play
+   Console route reached `https://play.google.com/console/signup` with the
+   title **Creating a developer account**, rather than an existing verified
+   developer dashboard. No Console form was submitted.
 
-The target API response intentionally conflates a package that has not been
+The two Publisher API probes are deliberately recorded as temporary remote
+writes, not as read-only operations. Neither reached an edit commit, and there
+was no committed or public release/track/metadata/binary mutation. The target
+API response intentionally conflates a package that has not been
 registered with an app to which this service account has not been granted
 access. The known-package probe rules out a broken/unlinked credential but
 cannot distinguish those two target-side conditions. It also provides no exact
@@ -80,4 +92,4 @@ dashboard is available, the continuation is:
 | --- | --- | ---: | --- |
 | Mobile | `internal` | — | Not read: app is not accessible to the available credential/session. |
 | Wear OS | dedicated internal track | — | Not read: exact track is unknown; no upload attempted. |
-| Production | `production` | — | Untouched; no mutation attempted. |
+| Production | `production` | — | No committed production release, track, metadata, or binary mutation; only the uncommitted transient edit probes above occurred. |

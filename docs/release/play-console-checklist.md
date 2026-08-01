@@ -41,7 +41,9 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
   candidate can read a known Miharana Play app but returned
   `package-not-found-or-not-authorized` for this package. The target is either
   unregistered or not yet granted to that credential; the API response does
-  not distinguish those states.
+  not distinguish those states. This verification necessarily created two
+  transient Publisher edits; neither had an `edit.commit` call or any uploaded
+  binary, metadata, or asset.
 - [ ] Play Console bootstrap is blocked at the **Creating a developer account**
   page in the only available Chrome session; no alternate in-app-browser
   session was available. No account, app record, declaration, tester, listing,
@@ -49,4 +51,5 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 - [ ] The exact Wear OS dedicated internal track is not known. It must be read
   from the authorized Console/API before a Wear AAB upload.
 - [ ] The signed candidate hashes and this attempt are recorded in
-  `internal-release-evidence.md`. Production remains untouched.
+  `internal-release-evidence.md`. No production release, track, metadata, or
+  binary was committed.
