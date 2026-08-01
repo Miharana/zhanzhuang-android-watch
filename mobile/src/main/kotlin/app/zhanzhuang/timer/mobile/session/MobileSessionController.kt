@@ -45,7 +45,7 @@ data class MobileSessionUiState(
 interface MobileSessionController {
     val state: StateFlow<MobileSessionUiState>
     suspend fun recover(): Boolean
-    suspend fun start(config: SessionConfig)
+    suspend fun start(config: SessionConfig, sessionId: String? = null)
     suspend fun pause()
     suspend fun resume()
     suspend fun finish(cancelled: Boolean = false)
@@ -70,16 +70,22 @@ class DefaultMobileSessionController(
     private var acknowledgedReminderIndex = 0
     private var lastPersistedActiveMs = 0L
 
-    override suspend fun start(config: SessionConfig) = mutex.withLock {
-        check(repository.activeSession() == null) { "A session is already active" }
+    override suspend fun start(config: SessionConfig, sessionId: String?) = mutex.withLock {
+        val existing = repository.activeSession()
+        check(existing == null || existing.id == sessionId) { "A session is already active" }
         val nowElapsed = elapsedClock.nowMillis()
-        val started = SessionRecord(
-            id = UUID.randomUUID().toString(),
-            revision = 1,
+        val started = (existing ?: SessionRecord(
+            id = sessionId ?: UUID.randomUUID().toString(),
+            revision = 0,
             config = config,
-            status = SessionStatus.RUNNING,
             owner = SessionOwner.MOBILE,
             startEpochMillis = wallClock.nowMillis(),
+        )).copy(
+            config = config,
+            revision = (existing?.revision ?: 0) + 1,
+            status = SessionStatus.RUNNING,
+            owner = SessionOwner.MOBILE,
+            startEpochMillis = existing?.startEpochMillis ?: wallClock.nowMillis(),
         )
         record = started
         sessionClock = SessionClock(config, nowElapsed)

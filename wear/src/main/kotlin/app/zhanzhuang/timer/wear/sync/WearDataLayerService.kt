@@ -1,6 +1,9 @@
 package app.zhanzhuang.timer.wear.sync
 
 import android.content.Context
+import androidx.room.Room
+import app.zhanzhuang.timer.wear.data.WearDatabase
+import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.model.PATH_ACK
 import app.zhanzhuang.timer.model.PATH_COMMAND
 import app.zhanzhuang.timer.model.PATH_COMPLETED
@@ -10,6 +13,7 @@ import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
 import app.zhanzhuang.timer.model.SyncWireCodec
 import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
@@ -21,30 +25,50 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object WearSyncRuntime {
-    @Volatile var coordinator: WearSyncCoordinator? = null
+    @Volatile private var coordinator: WearSyncCoordinator? = null
+    fun get(context: Context): WearSyncCoordinator = coordinator ?: synchronized(this) {
+        coordinator ?: run {
+            val repository = WearSessionRepository(
+                Room.databaseBuilder(context.applicationContext, WearDatabase::class.java, "wear-sessions.db").build(),
+            )
+            WearSyncCoordinator(
+                outbox = WearRepositoryCompletionOutbox(repository),
+                transport = WearAndroidDataLayerTransport(context.applicationContext),
+                controller = WearServiceSyncController(context.applicationContext, repository),
+            ).also { coordinator = it }
+        }
+    }
 }
 
 class WearDataLayerService : com.google.android.gms.wearable.WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val receiveMutex = Mutex()
+
+    override fun onCreate() {
+        super.onCreate()
+        scope.launch { runCatching { WearSyncRuntime.get(applicationContext).resendCompleted() } }
+    }
 
     override fun onMessageReceived(event: MessageEvent) {
         if (event.path !in setOf(PATH_COMMAND, PATH_STATE, PATH_ACK)) return
         scope.launch {
             val envelope = runCatching { SyncWireCodec.decodeMessage(event.data) }.getOrNull() ?: return@launch
-            WearSyncRuntime.coordinator?.receiveCommand(envelope)
+            receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope) } }
         }
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
-        dataEvents.filter { it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path?.startsWith(PATH_COMPLETED) == true }
+        dataEvents.filter { it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path?.startsWith("$PATH_COMPLETED/") == true }
             .forEach { event ->
                 val payload = runCatching { DataMapItem.fromDataItem(event.dataItem).dataMap.getByteArray(SyncWireCodec.DATA_KEY_ENVELOPE) }
                     .getOrNull() ?: return@forEach
                 scope.launch {
                     val envelope = runCatching { SyncWireCodec.decodeCompleted(payload) }.getOrNull() ?: return@launch
-                    WearSyncRuntime.coordinator?.receiveCommand(envelope)
+                    receiveMutex.withLock { runCatching { WearSyncRuntime.get(applicationContext).receiveCommand(envelope) } }
                 }
             }
     }
@@ -64,7 +88,10 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
             is SyncPayload.State -> PATH_STATE
             else -> PATH_COMMAND
         }
-        val nodes = Wearable.getNodeClient(appContext).connectedNodes.await()
+        val nodes = Wearable.getCapabilityClient(appContext)
+            .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_REACHABLE)
+            .await()
+            .nodes
         return nodes.map { node ->
             runCatching { Wearable.getMessageClient(appContext).sendMessage(node.id, path, SyncWireCodec.encodeMessage(envelope)).await() }.isSuccess
         }.any { it }
@@ -76,4 +103,6 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
         }.asPutDataRequest().setUrgent()
         return runCatching { Wearable.getDataClient(appContext).putDataItem(request).await() }.isSuccess
     }
+
+    private companion object { const val CAPABILITY_NAME = "zhan_zhang_sync" }
 }

@@ -16,6 +16,11 @@ class SyncConflictResolver {
         incoming.revision > current.revision -> incoming
         incoming.revision < current.revision -> current
         incoming.status.isTerminal && !current.status.isTerminal -> incoming
+        // A phone provisional record is only a handshake reservation.  Wear's
+        // equal-revision state confirms it accepted the same start request.
+        current.owner == app.zhanzhuang.timer.model.SessionOwner.MOBILE &&
+            incoming.owner == app.zhanzhuang.timer.model.SessionOwner.WEAR &&
+            current.status == SessionStatus.STARTING -> incoming
         else -> current
     }
 

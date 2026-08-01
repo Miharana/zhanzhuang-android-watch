@@ -124,7 +124,7 @@ class MobileSessionServiceTest {
             return true
         }
 
-        override suspend fun start(config: SessionConfig) {
+        override suspend fun start(config: SessionConfig, sessionId: String?) {
             calls += "start"
         }
 
@@ -170,7 +170,7 @@ class MobileSessionServiceTest {
             return state.value.session?.status == SessionStatus.RUNNING
         }
 
-        override suspend fun start(config: SessionConfig) {
+        override suspend fun start(config: SessionConfig, sessionId: String?) {
             calls += "start"
             started = true
             mutableState.value = MobileSessionUiState(

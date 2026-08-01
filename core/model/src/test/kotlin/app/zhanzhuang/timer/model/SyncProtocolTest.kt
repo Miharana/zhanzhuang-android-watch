@@ -2,6 +2,7 @@ package app.zhanzhuang.timer.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class SyncProtocolTest {
     @Test
@@ -24,5 +25,18 @@ class SyncProtocolTest {
         )
 
         assertEquals(envelope, SyncWireCodec.decodeCompletedFromOutbox(SyncWireCodec.encodeCompletedForOutbox(envelope)))
+    }
+
+    @Test
+    fun rejectsOversizedAndCorruptWireInputsBeforeAllocation() {
+        assertFailsWith<IllegalArgumentException> {
+            SyncWireCodec.decodeMessage(ByteArray(SyncWireCodec.MAX_MESSAGE_BYTES + 1))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SyncWireCodec.decodeCompleted(ByteArray(SyncWireCodec.MAX_COMPLETED_COMPRESSED_BYTES + 1))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SyncWireCodec.decodeCompleted(byteArrayOf(1, 2, 3))
+        }
     }
 }

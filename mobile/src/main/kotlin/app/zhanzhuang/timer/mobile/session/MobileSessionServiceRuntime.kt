@@ -20,8 +20,8 @@ class MobileSessionServiceRuntime(
         return recovered
     }
 
-    suspend fun start(config: SessionConfig, startId: Int? = null) {
-        controller.start(config)
+    suspend fun start(config: SessionConfig, sessionId: String? = null, startId: Int? = null) {
+        controller.start(config, sessionId)
         synchronizeService(startId)
     }
 

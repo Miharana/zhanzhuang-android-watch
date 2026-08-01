@@ -26,6 +26,14 @@ class SyncConflictResolverTest {
         assertEquals(completed, resolver.merge(completed, running))
     }
 
+    @Test
+    fun wearStateConfirmsEqualRevisionMobileProvisional() {
+        val provisional = record(revision = 1, status = SessionStatus.STARTING, owner = SessionOwner.MOBILE)
+        val acceptedOnWear = record(revision = 1, status = SessionStatus.RUNNING, owner = SessionOwner.WEAR)
+
+        assertEquals(acceptedOnWear, resolver.merge(provisional, acceptedOnWear))
+    }
+
     private fun record(
         revision: Long,
         status: SessionStatus,

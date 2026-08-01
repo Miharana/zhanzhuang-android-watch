@@ -13,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 interface MobileSyncController {
     suspend fun startFromMobile(config: SessionConfig, sessionId: String, revision: Long): SessionRecord
@@ -40,8 +42,9 @@ class MobileSyncCoordinator(
 ) {
     private val seenEventIds = LinkedHashSet<String>()
     private val fallbackJobs = mutableMapOf<String, Job>()
+    private val mutex = Mutex()
 
-    suspend fun startFromMobile(config: SessionConfig): SessionRecord {
+    suspend fun startFromMobile(config: SessionConfig): SessionRecord = mutex.withLock {
         val sessionId = UUID.randomUUID().toString()
         val record = controller.startFromMobile(config, sessionId, revision = 1)
         val start = envelope(record, SyncPayload.Start(config, nowEpochMillis() + START_EXPIRY_MS))
@@ -58,7 +61,7 @@ class MobileSyncCoordinator(
         return record
     }
 
-    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean {
+    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean = mutex.withLock {
         if (!acceptEnvelope(envelope)) return false
         return when (val payload = envelope.payload) {
             is SyncPayload.Start -> {
@@ -85,7 +88,7 @@ class MobileSyncCoordinator(
         }
     }
 
-    suspend fun receiveCompleted(envelope: SyncEnvelope): Boolean {
+    suspend fun receiveCompleted(envelope: SyncEnvelope): Boolean = mutex.withLock {
         if (!acceptEnvelope(envelope)) return false
         val completed = envelope.payload as? SyncPayload.Completed ?: return false
         return processCompleted(envelope, completed)
@@ -93,14 +96,13 @@ class MobileSyncCoordinator(
 
     private suspend fun processCompleted(envelope: SyncEnvelope, completed: SyncPayload.Completed): Boolean {
         if (!mergeRemote(completed.record)) return false
-        transport.sendMessage(
+        return transport.sendMessage(
             envelope(
                 completed.record,
                 SyncPayload.Ack(acceptedRevision = completed.record.revision),
                 eventId = envelope.eventId,
             ),
         )
-        return true
     }
 
     private suspend fun mergeRemote(incoming: SessionRecord): Boolean {

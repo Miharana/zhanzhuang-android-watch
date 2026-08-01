@@ -10,6 +10,8 @@ import app.zhanzhuang.timer.model.SyncTransport
 import app.zhanzhuang.timer.wear.data.OutboxEntity
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class OutboxEntry(
     val eventId: String,
@@ -42,11 +44,12 @@ class WearSyncCoordinator(
     private val resolver: SyncConflictResolver = SyncConflictResolver(),
 ) {
     private val seenEventIds = LinkedHashSet<String>()
+    private val mutex = Mutex()
 
-    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean {
+    suspend fun receiveCommand(envelope: SyncEnvelope): Boolean = mutex.withLock {
         if (!acceptEnvelope(envelope)) return false
         return when (val payload = envelope.payload) {
-            is SyncPayload.Ack -> acknowledge(envelope.eventId, payload.acceptedRevision)
+            is SyncPayload.Ack -> acknowledge(envelope.eventId, envelope.sessionId, envelope.revision, payload.acceptedRevision)
             is SyncPayload.Start -> {
                 if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
                 if (isLowerRevision(envelope)) return false
@@ -65,16 +68,21 @@ class WearSyncCoordinator(
         }
     }
 
-    suspend fun resendCompleted() {
+    suspend fun resendCompleted() = mutex.withLock {
         outbox.pendingCompleted().forEach { entry ->
             transport.putCompleted(entry.envelope)
         }
     }
 
-    private suspend fun acknowledge(eventId: String, revision: Long): Boolean {
-        val matching = outbox.pendingCompleted().any { it.eventId == eventId && it.revision == revision }
+    private suspend fun acknowledge(eventId: String, sessionId: String, envelopeRevision: Long, acceptedRevision: Long): Boolean {
+        val matching = outbox.pendingCompleted().any {
+            it.eventId == eventId &&
+                it.sessionId == sessionId &&
+                it.revision == envelopeRevision &&
+                it.revision == acceptedRevision
+        }
         if (!matching) return false
-        outbox.acknowledge(eventId, revision)
+        outbox.acknowledge(eventId, acceptedRevision)
         return true
     }
 
@@ -122,5 +130,8 @@ class WearRepositoryCompletionOutbox(private val repository: WearSessionReposito
 
 private fun OutboxEntity.toOutboxEntryOrNull(): OutboxEntry? = runCatching {
     val envelope = app.zhanzhuang.timer.model.SyncWireCodec.decodeCompletedFromOutbox(payload)
+    require(envelope.eventId == eventId && envelope.sessionId == sessionId && envelope.revision == revision)
+    require((envelope.payload as app.zhanzhuang.timer.model.SyncPayload.Completed).record.id == sessionId)
+    require((envelope.payload as app.zhanzhuang.timer.model.SyncPayload.Completed).record.revision == revision)
     OutboxEntry(eventId, sessionId, revision, envelope)
 }.getOrNull()

@@ -38,6 +38,19 @@ class WearSyncCoordinatorTest {
         assertEquals(1, transport.completedAttempts)
     }
 
+    @Test
+    fun ackWithWrongSessionOrEnvelopeRevisionCannotClearOutbox() = runTest {
+        val outbox = FakeOutbox()
+        outbox.pending += OutboxEntry("event-1", "session-1", 4, envelope("event-1", 4, SyncPayload.Completed(record(4))))
+
+        WearSyncCoordinator(outbox, FakeTransport()).receiveCommand(
+            envelope("event-1", 4, SyncPayload.Ack(4)).copy(sessionId = "other-session"),
+        )
+        assertEquals(1, outbox.pending.size)
+        WearSyncCoordinator(outbox, FakeTransport()).receiveCommand(envelope("event-1", 3, SyncPayload.Ack(4)))
+        assertEquals(1, outbox.pending.size)
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",

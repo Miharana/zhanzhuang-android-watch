@@ -17,6 +17,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MobileSyncCoordinatorTest {
@@ -93,6 +95,34 @@ class MobileSyncCoordinatorTest {
         assertEquals(SessionOwner.MOBILE, controller.owner())
     }
 
+    @Test
+    fun wearStateBeforeOrAfterQueryCancelsMobileFallback() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, TestScope(StandardTestDispatcher(testScheduler)), { testScheduler.currentTime })
+        val provisional = coordinator.startFromMobile(SessionConfig())
+
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(coordinator.receiveCommand(envelope("wear-state", 1, SyncPayload.State(provisional.copy(owner = SessionOwner.WEAR, status = SessionStatus.RUNNING)))))
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        assertEquals(SessionOwner.WEAR, controller.owner())
+        assertEquals(2, transport.sentPayloadNames.size)
+    }
+
+    @Test
+    fun concurrentDuplicateStartExecutesOnlyOnce() = runTest {
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(FakeTransport(), controller, this, nowEpochMillis = { 1_000L })
+        val start = envelope("one-start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000L))
+
+        listOf(async { coordinator.receiveCommand(start) }, async { coordinator.receiveCommand(start) }).awaitAll()
+
+        assertEquals(1, controller.remoteStarts)
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -123,7 +153,7 @@ class MobileSyncCoordinatorTest {
         }
 
         override suspend fun startFromMobile(config: SessionConfig, sessionId: String, revision: Long): SessionRecord =
-            record.copy(config = config, id = sessionId, revision = revision, owner = SessionOwner.MOBILE)
+            record.copy(config = config, id = sessionId, revision = revision, owner = SessionOwner.MOBILE, status = SessionStatus.STARTING)
                 .also { record = it }
 
         override suspend fun current(): SessionRecord? = record

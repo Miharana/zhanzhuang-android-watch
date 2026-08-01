@@ -46,6 +46,9 @@ interface SyncTransport {
 
 object SyncWireCodec {
     const val DATA_KEY_ENVELOPE = "sync_envelope_gzip"
+    const val MAX_MESSAGE_BYTES = 32 * 1024
+    const val MAX_COMPLETED_COMPRESSED_BYTES = 64 * 1024
+    const val MAX_COMPLETED_DECOMPRESSED_BYTES = 256 * 1024
 
     private val json = Json {
         classDiscriminator = "type"
@@ -53,23 +56,55 @@ object SyncWireCodec {
         ignoreUnknownKeys = false
     }
 
-    fun encodeMessage(envelope: SyncEnvelope): ByteArray = json.encodeToString(envelope).encodeToByteArray()
+    fun encodeMessage(envelope: SyncEnvelope): ByteArray = json.encodeToString(envelope).encodeToByteArray().also {
+        require(it.size <= MAX_MESSAGE_BYTES) { "Sync message exceeds $MAX_MESSAGE_BYTES bytes" }
+    }
 
-    fun decodeMessage(bytes: ByteArray): SyncEnvelope = json.decodeFromString(bytes.decodeToString())
+    fun decodeMessage(bytes: ByteArray): SyncEnvelope {
+        require(bytes.size <= MAX_MESSAGE_BYTES) { "Sync message exceeds $MAX_MESSAGE_BYTES bytes" }
+        return json.decodeFromString(bytes.decodeToString())
+    }
 
     fun encodeCompleted(envelope: SyncEnvelope): ByteArray {
         require(envelope.payload is SyncPayload.Completed) { "Only completion records are DataItems" }
         val encoded = encodeMessage(envelope)
         return ByteArrayOutputStream().use { output ->
             GZIPOutputStream(output).use { it.write(encoded) }
-            output.toByteArray()
+            output.toByteArray().also {
+                require(it.size <= MAX_COMPLETED_COMPRESSED_BYTES) { "Completion payload exceeds $MAX_COMPLETED_COMPRESSED_BYTES bytes" }
+            }
         }
     }
 
-    fun decodeCompleted(bytes: ByteArray): SyncEnvelope =
-        GZIPInputStream(ByteArrayInputStream(bytes)).use { input ->
-            decodeMessage(input.readBytes())
-        }.also { require(it.payload is SyncPayload.Completed) { "Completion DataItem carried a non-completion payload" } }
+    fun decodeCompleted(bytes: ByteArray): SyncEnvelope {
+        require(bytes.size <= MAX_COMPLETED_COMPRESSED_BYTES) { "Completion payload exceeds $MAX_COMPLETED_COMPRESSED_BYTES bytes" }
+        val decoded = try {
+            GZIPInputStream(ByteArrayInputStream(bytes)).use { input ->
+                val output = ByteArrayOutputStream()
+                val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(chunk)
+                    if (read == -1) break
+                    require(output.size() + read <= MAX_COMPLETED_DECOMPRESSED_BYTES) { "Completion payload expands beyond $MAX_COMPLETED_DECOMPRESSED_BYTES bytes" }
+                    output.write(chunk, 0, read)
+                }
+                output.toByteArray()
+            }
+        } catch (error: IllegalArgumentException) {
+            throw error
+        } catch (error: Exception) {
+            throw IllegalArgumentException("Invalid compressed completion payload", error)
+        }
+        return try {
+            json.decodeFromString<SyncEnvelope>(decoded.decodeToString()).also {
+                require(it.payload is SyncPayload.Completed) { "Completion DataItem carried a non-completion payload" }
+            }
+        } catch (error: IllegalArgumentException) {
+            throw error
+        } catch (error: Exception) {
+            throw IllegalArgumentException("Invalid completion payload", error)
+        }
+    }
 
     fun encodeCompletedForOutbox(envelope: SyncEnvelope): String =
         Base64.getEncoder().encodeToString(encodeCompleted(envelope))

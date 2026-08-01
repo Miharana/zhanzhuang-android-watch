@@ -25,7 +25,7 @@ class MobileSessionServiceRuntimeTest {
         private val mutableState = MutableStateFlow(MobileSessionUiState())
         override val state: StateFlow<MobileSessionUiState> = mutableState
         override suspend fun recover(): Boolean = false
-        override suspend fun start(config: app.zhanzhuang.timer.model.SessionConfig) = Unit
+        override suspend fun start(config: app.zhanzhuang.timer.model.SessionConfig, sessionId: String?) = Unit
         override suspend fun pause() = Unit
         override suspend fun resume() = Unit
         override suspend fun finish(cancelled: Boolean) = Unit

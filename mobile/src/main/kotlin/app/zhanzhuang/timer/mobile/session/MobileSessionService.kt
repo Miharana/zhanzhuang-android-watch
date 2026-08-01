@@ -70,14 +70,16 @@ open class MobileSessionService : Service() {
             actionMutex.withLock {
                 when (intent?.action) {
                     ACTION_START -> {
-                        if (!runtime.recover(tearDownWhenInactive = false, startId = startId)) {
-                            runtime.start(
-                                SessionConfig(
-                                    intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
-                                    intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
-                                ),
-                                startId,
-                            )
+                        val config = SessionConfig(
+                            intent.getIntExtra(EXTRA_DURATION_MINUTES, 30),
+                            intent.getIntExtra(EXTRA_INTERVAL_MINUTES, 10),
+                        )
+                        val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+                        if (sessionId == null) {
+                            if (!runtime.recover(tearDownWhenInactive = false, startId = startId)) runtime.start(config, null, startId)
+                        } else {
+                            // Data Layer fallback has already durably reserved this exact ID.
+                            runtime.start(config, sessionId, startId)
                         }
                     }
                     ACTION_PAUSE -> {
@@ -191,14 +193,16 @@ open class MobileSessionService : Service() {
         const val EXTRA_DURATION_MINUTES = "duration_minutes"
         const val EXTRA_INTERVAL_MINUTES = "interval_minutes"
         const val EXTRA_CANCELLED = "cancelled"
+        const val EXTRA_SESSION_ID = "session_id"
 
         internal var testDependencies: MobileSessionServiceDependencies? = null
 
-        fun start(context: Context, config: SessionConfig) {
+        fun start(context: Context, config: SessionConfig, sessionId: String? = null) {
             val intent = Intent(context, MobileSessionService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_DURATION_MINUTES, config.durationMinutes)
                 .putExtra(EXTRA_INTERVAL_MINUTES, config.intervalMinutes)
+                .putExtra(EXTRA_SESSION_ID, sessionId)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
             else context.startService(intent)
         }
