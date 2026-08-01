@@ -41,11 +41,13 @@ class WearSessionRepositoryTest {
     }
 
     @Test
-    fun acknowledgmentOnlyRemovesMatchingOrNewerRevision() = runTest {
+    fun acknowledgmentOnlyRemovesExactlyMatchingRevision() = runTest {
         repository.upsert(record(revision = 2, status = SessionStatus.COMPLETED))
         repository.enqueueCompleted("event-1", "s1", revision = 2, payload = "payload")
 
         repository.acknowledge("event-1", revision = 1)
+        assertEquals(1, repository.pendingOutbox().size)
+        repository.acknowledge("event-1", revision = 3)
         assertEquals(1, repository.pendingOutbox().size)
         repository.acknowledge("event-1", revision = 2)
 

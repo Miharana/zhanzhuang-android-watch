@@ -80,7 +80,7 @@ interface WearSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveOutbox(entity: OutboxEntity)
 
-    @Query("DELETE FROM wear_sync_outbox WHERE eventId = :eventId AND revision <= :acknowledgedRevision")
+    @Query("DELETE FROM wear_sync_outbox WHERE eventId = :eventId AND revision = :acknowledgedRevision")
     suspend fun deleteAcknowledged(eventId: String, acknowledgedRevision: Long)
 
     @Transaction
