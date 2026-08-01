@@ -42,6 +42,20 @@ class SyncProtocolTest {
     }
 
     @Test
+    fun runtimeAnchorSupportsTheWearStartingRecoveryBoundary() {
+        val runtime = SessionRuntime(
+            sessionId = "session-1",
+            revision = 1,
+            status = SessionStatus.STARTING,
+            activeDurationMs = 0,
+            remainingMs = 1_800_000,
+            reportedAtEpochMillis = 1_000,
+        )
+
+        assertEquals(SessionStatus.STARTING, runtime.status)
+    }
+
+    @Test
     fun threeHourHeartRateTransferIsBoundedAndKeepsEndpoints() {
         val samples = (0 until 10_800).map { HeartRateSample(1_000L + it * 1_000L, 60.0 + it % 5, SampleAccuracy.HIGH) }
         val envelope = SyncEnvelope(eventId = "event", sessionId = "session", revision = 4, sentAtEpochMillis = 1_000, payload = SyncPayload.Completed(

@@ -287,6 +287,29 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun runtimeRevisionKeepsWatchControlsAheadOfTheStalePhoneRecord() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR).copy(revision = 2)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 10_000L })
+        val runtime = app.zhanzhuang.timer.model.SessionRuntime(
+            sessionId = "session-1",
+            revision = 7,
+            status = SessionStatus.RUNNING,
+            activeDurationMs = 60_000L,
+            remainingMs = 1_740_000L,
+            reportedAtEpochMillis = 10_000L,
+        )
+
+        assertTrue(coordinator.receiveCommand(envelope("runtime-revision", 7, SyncPayload.Runtime(runtime))))
+        assertTrue(coordinator.requestPause("session-1"))
+        assertTrue(coordinator.requestResume("session-1"))
+        assertTrue(coordinator.requestFinish("session-1", cancelled = false))
+
+        assertEquals(listOf(7L, 7L, 7L), transport.envelopes.takeLast(3).map { it.revision })
+        assertEquals(listOf("PAUSE", "RESUME", "FINISH"), transport.sentPayloadNames.takeLast(3))
+    }
+
+    @Test
     fun disconnectedStartImmediatelyReservesAndStartsOnePhoneOwnedSession() = runTest {
         val transport = FakeTransport()
         val controller = FakeController()

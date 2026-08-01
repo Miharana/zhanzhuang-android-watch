@@ -44,6 +44,12 @@ class MobileSyncCoordinator(
 ) {
     private val seenEventIds = LinkedHashSet<String>()
     private val fallbackJobs = mutableMapOf<String, Job>()
+    /**
+     * Room intentionally does not persist high-frequency Wear checkpoints.
+     * Keep their revision here so a later remote control command is not
+     * rejected as older than the watch's heart-rate/checkpoint update.
+     */
+    private val latestRuntimeRevisions = mutableMapOf<String, Long>()
     private val mutex = Mutex()
 
     suspend fun startFromMobile(config: SessionConfig): SessionRecord = mutex.withLock {
@@ -101,7 +107,8 @@ class MobileSyncCoordinator(
     private suspend fun requestRemoteCommand(sessionId: String, payload: SyncPayload): Boolean = mutex.withLock {
         val current = controller.session(sessionId) ?: return false
         if (current.owner != SessionOwner.WEAR || current.status !in ACTIVE_STATUSES) return false
-        transport.sendMessage(envelope(current, payload))
+        val commandRevision = maxOf(current.revision, latestRuntimeRevisions[current.id] ?: current.revision)
+        transport.sendMessage(envelope(current.copy(revision = commandRevision), payload))
     }
 
     suspend fun receiveCommand(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
@@ -198,6 +205,10 @@ class MobileSyncCoordinator(
         val current = controller.session(runtime.sessionId) ?: return false
         if (current.owner != SessionOwner.WEAR || current.status in TERMINAL_STATUSES) return false
         if (runtime.revision < current.revision) return false
+        latestRuntimeRevisions[runtime.sessionId] = maxOf(
+            latestRuntimeRevisions[runtime.sessionId] ?: current.revision,
+            runtime.revision,
+        )
         runtimeSink(runtime)
         return true
     }
@@ -210,6 +221,9 @@ class MobileSyncCoordinator(
         val winner = resolver.merge(current, incoming)
         if (winner != incoming) return false
         controller.mergeRemote(winner)
+        if (winner.owner != SessionOwner.WEAR || winner.status in TERMINAL_STATUSES) {
+            latestRuntimeRevisions.remove(winner.id)
+        }
         fallbackJobs.remove(incoming.id)?.cancel()
         return true
     }

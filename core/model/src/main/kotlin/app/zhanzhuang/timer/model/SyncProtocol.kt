@@ -53,7 +53,7 @@ data class SessionRuntime(
         require(revision >= 0)
         require(activeDurationMs >= 0)
         require(remainingMs >= 0)
-        require(status in setOf(SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING))
+        require(status in setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING))
     }
 }
 
