@@ -13,7 +13,8 @@ class OngoingSessionNotification(private val context: Context) {
     fun build(state: WearSessionUiState?, touchIntent: PendingIntent): android.app.Notification {
         ensureChannel()
         val text = when (state?.record?.status) {
-            null, app.zhanzhuang.timer.model.SessionStatus.STARTING -> "Preparing your session"
+            null -> "Recovering saved session"
+            app.zhanzhuang.timer.model.SessionStatus.STARTING -> "Preparing your session"
             app.zhanzhuang.timer.model.SessionStatus.RUNNING -> "Session in progress · ${formatRemaining(state.remainingMs)} remaining"
             app.zhanzhuang.timer.model.SessionStatus.PAUSED -> "Session paused"
             app.zhanzhuang.timer.model.SessionStatus.COMPLETING -> "Finishing session"
@@ -30,7 +31,11 @@ class OngoingSessionNotification(private val context: Context) {
             .setOngoing(state?.record?.status in ACTIVE_NOTIFICATION_STATUSES)
             .setOnlyAlertOnce(true)
             .setContentIntent(touchIntent)
-        OngoingActivity.Builder(context, NOTIFICATION_ID, builder).build().apply(context)
+        // Task 7 will replace this temporary STATUS tap target with a session screen.
+        // Never attach an ongoing-activity extension for an empty or terminal state.
+        if (state?.record?.status in ACTIVE_NOTIFICATION_STATUSES) {
+            OngoingActivity.Builder(context, NOTIFICATION_ID, builder).build().apply(context)
+        }
         return builder.build()
     }
 

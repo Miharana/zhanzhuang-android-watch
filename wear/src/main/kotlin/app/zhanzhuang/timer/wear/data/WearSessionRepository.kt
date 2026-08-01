@@ -124,6 +124,13 @@ interface WearSessionDao {
         if (existing != null && entity.revision <= existing.revision) return
         saveOutbox(entity)
     }
+
+    /** Completion and its transferable event are one crash-atomic durable decision. */
+    @Transaction
+    suspend fun saveCompletedWithOutbox(record: SessionRecord, entity: OutboxEntity) {
+        saveSessionIfNewer(record)
+        enqueueIfCurrent(entity)
+    }
 }
 
 class WearSessionRepository(private val dao: WearSessionDao) {
@@ -153,6 +160,14 @@ class WearSessionRepository(private val dao: WearSessionDao) {
                 payload = payload,
                 nextAttemptEpochMs = nextAttemptEpochMs,
             ),
+        )
+    }
+
+    suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) {
+        require(record.status == SessionStatus.COMPLETED) { "Only completed Wear sessions can enqueue completion" }
+        dao.saveCompletedWithOutbox(
+            record,
+            OutboxEntity(eventId = eventId, sessionId = record.id, revision = record.revision, payload = payload),
         )
     }
 

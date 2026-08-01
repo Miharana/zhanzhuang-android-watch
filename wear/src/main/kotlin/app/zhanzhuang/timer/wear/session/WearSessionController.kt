@@ -34,8 +34,10 @@ interface WearSessionController {
     suspend fun resume()
     suspend fun finish(cancelled: Boolean = false)
     suspend fun tick()
-    suspend fun recover(currentBootId: String)
+    suspend fun recover(currentBootId: String): WearSessionRecovery
 }
+
+enum class WearSessionRecovery { NO_SESSION, ACTIVE, TERMINAL }
 
 interface WearSessionClock {
     fun elapsedRealtimeMs(): Long
@@ -52,6 +54,7 @@ interface WearSessionRecordStore {
     suspend fun get(id: String): SessionRecord?
     suspend fun upsert(record: SessionRecord)
     suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String)
+    suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String)
 }
 
 class WearSessionControllerImpl(
@@ -70,6 +73,9 @@ class WearSessionControllerImpl(
     private var runningSinceBootMs: Long? = null
     private var nextReminderAtActiveMs: Long? = null
     private var healthExerciseOwned = false
+    private var pendingOperation: WearExternalOperation? = null
+    private var pausedSinceBootMs: Long? = null
+    private var intendedTerminalStatus: SessionStatus? = null
     private var currentHeartRateBpm: Double? = null
     private var heartRateUnavailableReason: String? = null
     private var lastStoredSampleAtBootMs = 0L
@@ -88,6 +94,8 @@ class WearSessionControllerImpl(
         runningSinceBootMs = null
         nextReminderAtActiveMs = config.intervalMinutes * MINUTE_MS
         healthExerciseOwned = false
+        pendingOperation = WearExternalOperation.START
+        intendedTerminalStatus = null
         currentHeartRateBpm = null
         heartRateUnavailableReason = null
         persistSnapshotAndRecord()
@@ -103,6 +111,7 @@ class WearSessionControllerImpl(
                 heartRateUnavailableReason = result.reason.name
             }
         }
+        pendingOperation = null
         record = record!!.copy(status = SessionStatus.RUNNING)
         runningSinceBootMs = clock.elapsedRealtimeMs()
         persistSnapshotAndRecord()
@@ -111,19 +120,32 @@ class WearSessionControllerImpl(
 
     override suspend fun pause() = mutex.withLock {
         val active = record?.takeIf { it.status == SessionStatus.RUNNING } ?: return
-        record = active.copy(status = SessionStatus.PAUSED, activeDurationMs = activeDurationNow())
-        runningSinceBootMs = null
+        record = active.copy(activeDurationMs = activeDurationNow())
+        runningSinceBootMs = null // Freeze elapsed work before durable PAUSE intent/recovery.
+        pausedSinceBootMs = clock.elapsedRealtimeMs()
+        pendingOperation = WearExternalOperation.PAUSE
         persistSnapshotAndRecord()
         if (healthExerciseOwned) health.pause()
+        record = record!!.copy(status = SessionStatus.PAUSED)
+        runningSinceBootMs = null
+        pendingOperation = null
+        persistSnapshotAndRecord()
         haptics.play(Cue.PAUSE)
     }
 
     override suspend fun resume() = mutex.withLock {
         val paused = record?.takeIf { it.status == SessionStatus.PAUSED } ?: return
-        record = paused.copy(status = SessionStatus.RUNNING)
-        runningSinceBootMs = clock.elapsedRealtimeMs()
+        pendingOperation = WearExternalOperation.RESUME
         persistSnapshotAndRecord()
         if (healthExerciseOwned) health.resume()
+        record = paused.copy(
+            status = SessionStatus.RUNNING,
+            pausedDurationMs = paused.pausedDurationMs + (clock.elapsedRealtimeMs() - (pausedSinceBootMs ?: clock.elapsedRealtimeMs())).coerceAtLeast(0),
+        )
+        runningSinceBootMs = clock.elapsedRealtimeMs()
+        pausedSinceBootMs = null
+        pendingOperation = null
+        persistSnapshotAndRecord()
         haptics.play(Cue.RESUME)
     }
 
@@ -158,8 +180,13 @@ class WearSessionControllerImpl(
                 publishState()
             }
             is WearHealthUpdate.HeartRate -> {
-                val active = record?.takeIf { it.status in ACTIVE_STATUSES } ?: return
-                val sample = HeartRateSample(clock.epochMillis(), update.bpm, SampleAccuracy.HIGH)
+                val active = record?.takeIf { it.status == SessionStatus.RUNNING && healthExerciseOwned } ?: return
+                if (update.bpm !in MIN_HEART_RATE..MAX_HEART_RATE) return
+                val sample = HeartRateSample(
+                    epochMillis = (clock.epochMillis() - clock.elapsedRealtimeMs() + update.timeSinceBootMs),
+                    bpm = update.bpm,
+                    accuracy = SampleAccuracy.HIGH,
+                )
                 record = active.copy(heartRateSamples = active.heartRateSamples + sample)
                 currentHeartRateBpm = update.bpm
                 samplesSinceStore += 1
@@ -174,51 +201,96 @@ class WearSessionControllerImpl(
         }
     }
 
-    override suspend fun recover(currentBootId: String) = mutex.withLock {
-        val snapshot = snapshots.load() ?: return
+    override suspend fun recover(currentBootId: String): WearSessionRecovery = mutex.withLock {
+        val snapshot = snapshots.load() ?: return@withLock WearSessionRecovery.NO_SESSION
         record = snapshot.record
         runningSinceBootMs = snapshot.runningSinceBootMs
         nextReminderAtActiveMs = snapshot.nextReminderAtActiveMs
         healthExerciseOwned = snapshot.healthExerciseOwned
+        pendingOperation = snapshot.pendingOperation
+        pausedSinceBootMs = snapshot.pausedSinceBootMs
+        intendedTerminalStatus = snapshot.intendedTerminalStatus
+        if (record!!.status in TERMINAL_STATUSES) {
+            repairTerminalDurability(snapshotBootId = currentBootId)
+            publishState()
+            return@withLock WearSessionRecovery.TERMINAL
+        }
         if (snapshot.bootId != currentBootId && record!!.status in ACTIVE_STATUSES) {
             record = record!!.copy(status = SessionStatus.INTERRUPTED, endEpochMillis = clock.epochMillis())
             runningSinceBootMs = null
             healthExerciseOwned = false
             persistSnapshotAndRecord(currentBootId)
-            return
+            return@withLock WearSessionRecovery.TERMINAL
+        }
+        if (record!!.status == SessionStatus.STARTING || pendingOperation == WearExternalOperation.START) {
+            applyStartResult(health.start())
+            record = record!!.copy(status = SessionStatus.RUNNING)
+            runningSinceBootMs = clock.elapsedRealtimeMs()
+            pendingOperation = null
+            persistSnapshotAndRecord(currentBootId)
+            return@withLock WearSessionRecovery.ACTIVE
+        }
+        if (record!!.status == SessionStatus.COMPLETING || pendingOperation == WearExternalOperation.END) {
+            if (healthExerciseOwned) applyStartResult(health.reattach())
+            if (healthExerciseOwned) health.end()
+            healthExerciseOwned = false
+            pendingOperation = null
+            val terminalStatus = intendedTerminalStatus ?: SessionStatus.COMPLETED
+            record = record!!.copy(status = terminalStatus, endEpochMillis = clock.epochMillis())
+            if (terminalStatus == SessionStatus.COMPLETED) persistCompletedWithOutbox(currentBootId) else persistSnapshotAndRecord(currentBootId)
+            return@withLock WearSessionRecovery.TERMINAL
         }
         if (record!!.status == SessionStatus.RUNNING && runningSinceBootMs != null) {
             record = record!!.copy(activeDurationMs = activeDurationNow())
             runningSinceBootMs = clock.elapsedRealtimeMs()
         }
-        persistSnapshotAndRecord(currentBootId)
         if (record!!.status in ACTIVE_STATUSES && healthExerciseOwned) {
-            when (val result = health.start()) {
-                WearHealthStartResult.Started -> Unit
-                is WearHealthStartResult.StartedWithoutUpdates -> heartRateUnavailableReason = result.reason.name
-                is WearHealthStartResult.DurationOnly -> {
-                    healthExerciseOwned = false
-                    heartRateUnavailableReason = result.reason.name
-                    persistSnapshotAndRecord(currentBootId)
-                }
-            }
+            applyStartResult(health.reattach())
         }
+        if (record!!.status == SessionStatus.PAUSED && pendingOperation == null && healthExerciseOwned) {
+            // Reassert the paused external state after a process restart, with a durable retry marker.
+            pendingOperation = WearExternalOperation.PAUSE
+            persistSnapshotAndRecord(currentBootId)
+        }
+        when (pendingOperation) {
+            WearExternalOperation.PAUSE -> {
+                if (healthExerciseOwned) health.pause()
+                record = record!!.copy(status = SessionStatus.PAUSED, activeDurationMs = activeDurationNow())
+                runningSinceBootMs = null
+                pausedSinceBootMs = clock.elapsedRealtimeMs()
+                pendingOperation = null
+                persistSnapshotAndRecord(currentBootId)
+            }
+            WearExternalOperation.RESUME -> {
+                if (healthExerciseOwned) health.resume()
+                val paused = record!!
+                record = paused.copy(
+                    status = SessionStatus.RUNNING,
+                    pausedDurationMs = paused.pausedDurationMs + (clock.elapsedRealtimeMs() - (pausedSinceBootMs ?: clock.elapsedRealtimeMs())).coerceAtLeast(0),
+                )
+                runningSinceBootMs = clock.elapsedRealtimeMs()
+                pausedSinceBootMs = null
+                pendingOperation = null
+                persistSnapshotAndRecord(currentBootId)
+            }
+            else -> persistSnapshotAndRecord(currentBootId)
+        }
+        WearSessionRecovery.ACTIVE
     }
 
     private suspend fun finishLocked(cancelled: Boolean, activeDurationMs: Long = activeDurationNow()) {
         val active = record?.takeIf { it.status in ACTIVE_STATUSES } ?: return
         record = active.copy(status = SessionStatus.COMPLETING, activeDurationMs = activeDurationMs)
         runningSinceBootMs = null
+        pendingOperation = WearExternalOperation.END
+        intendedTerminalStatus = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED
         persistSnapshotAndRecord()
         if (healthExerciseOwned) health.end()
         healthExerciseOwned = false
+        pendingOperation = null
         val terminalStatus = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED
         record = record!!.copy(status = terminalStatus, endEpochMillis = clock.epochMillis())
-        persistSnapshotAndRecord()
-        if (!cancelled) {
-            val complete = record!!
-            records.enqueueCompleted("${complete.id}:${complete.revision}", complete.id, complete.revision, complete.toOutboxPayload())
-        }
+        if (cancelled) persistSnapshotAndRecord() else persistCompletedWithOutbox()
         haptics.play(if (cancelled) Cue.PAUSE else Cue.COMPLETE)
     }
 
@@ -247,6 +319,9 @@ class WearSessionControllerImpl(
                 runningSinceBootMs = runningSinceBootMs,
                 nextReminderAtActiveMs = nextReminderAtActiveMs,
                 healthExerciseOwned = healthExerciseOwned,
+                pendingOperation = pendingOperation,
+                pausedSinceBootMs = pausedSinceBootMs,
+                intendedTerminalStatus = intendedTerminalStatus,
             ),
         )
     }
@@ -264,12 +339,44 @@ class WearSessionControllerImpl(
 
     private fun SessionRecord.toOutboxPayload(): String = "{\"id\":\"$id\",\"revision\":$revision,\"status\":\"$status\"}"
 
+    private fun applyStartResult(result: WearHealthStartResult) {
+        when (result) {
+            WearHealthStartResult.Started -> healthExerciseOwned = true
+            is WearHealthStartResult.StartedWithoutUpdates -> { healthExerciseOwned = true; heartRateUnavailableReason = result.reason.name }
+            is WearHealthStartResult.DurationOnly -> { healthExerciseOwned = false; heartRateUnavailableReason = result.reason.name }
+        }
+    }
+
+    private suspend fun persistCompletedWithOutbox(snapshotBootId: String = bootId()) {
+        record = record!!.copy(revision = record!!.revision + 1)
+        saveSnapshotOnly(snapshotBootId)
+        val complete = record!!
+        records.completeWithOutbox(complete, "${complete.id}:${complete.revision}", complete.toOutboxPayload())
+        lastStoredSampleAtBootMs = clock.elapsedRealtimeMs()
+        samplesSinceStore = 0
+        publishState()
+    }
+
+    private suspend fun repairTerminalDurability(snapshotBootId: String) {
+        val terminal = record!!
+        if (terminal.status == SessionStatus.COMPLETED) {
+            records.completeWithOutbox(terminal, "${terminal.id}:${terminal.revision}", terminal.toOutboxPayload())
+        } else {
+            records.upsert(terminal)
+        }
+        // Keep the exact snapshot revision; terminal recovery must never stale the outbox.
+        saveSnapshotOnly(snapshotBootId)
+    }
+
     private companion object {
         const val MINUTE_MS = 60_000L
         const val SNAPSHOT_INTERVAL_MS = 60_000L
         const val SAMPLE_BATCH_INTERVAL_MS = 30_000L
         const val SAMPLE_BATCH_COUNT = 20
+        const val MIN_HEART_RATE = 20.0
+        const val MAX_HEART_RATE = 240.0
         val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
         fun emptyState() = WearSessionUiState(null, 0, null, null)
     }
 }
@@ -281,4 +388,6 @@ class RepositoryRecordStore(
     override suspend fun upsert(record: SessionRecord) = repository.upsert(record)
     override suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String) =
         repository.enqueueCompleted(eventId, sessionId, revision, payload)
+    override suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) =
+        repository.completeWithOutbox(record, eventId, payload)
 }

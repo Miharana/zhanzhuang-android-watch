@@ -79,6 +79,19 @@ class WearSessionRepositoryTest {
     }
 
     @Test
+    fun completionRecordAndExactRevisionOutboxCommitTogether() = runTest {
+        val completed = record(revision = 2, status = SessionStatus.COMPLETED)
+
+        repository.completeWithOutbox(completed, "event-2", "payload")
+
+        assertEquals(completed, repository.get("s1"))
+        assertEquals(
+            listOf(OutboxEntity(eventId = "event-2", sessionId = "s1", revision = 2, payload = "payload")),
+            repository.pendingOutbox(),
+        )
+    }
+
+    @Test
     fun getUsesOneAtomicAggregateDaoRead() = runTest {
         val samples = listOf(
             HeartRateSample(epochMillis = 1_001, bpm = 60.0, accuracy = SampleAccuracy.HIGH),

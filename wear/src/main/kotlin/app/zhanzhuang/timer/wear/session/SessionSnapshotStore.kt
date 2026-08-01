@@ -17,7 +17,12 @@ data class WearSessionSnapshot(
     val runningSinceBootMs: Long? = null,
     val nextReminderAtActiveMs: Long? = null,
     val healthExerciseOwned: Boolean = false,
+    val pendingOperation: WearExternalOperation? = null,
+    val pausedSinceBootMs: Long? = null,
+    val intendedTerminalStatus: SessionStatus? = null,
 )
+
+enum class WearExternalOperation { START, PAUSE, RESUME, END }
 
 interface SessionSnapshotStore {
     suspend fun save(snapshot: WearSessionSnapshot)
@@ -40,6 +45,9 @@ class SharedPreferencesSessionSnapshotStore(
         put("runningSinceBootMs", runningSinceBootMs)
         put("nextReminderAtActiveMs", nextReminderAtActiveMs)
         put("healthExerciseOwned", healthExerciseOwned)
+        put("pendingOperation", pendingOperation?.name)
+        put("pausedSinceBootMs", pausedSinceBootMs)
+        put("intendedTerminalStatus", intendedTerminalStatus?.name)
         put("id", record.id)
         put("revision", record.revision)
         put("durationMinutes", record.config.durationMinutes)
@@ -87,6 +95,9 @@ class SharedPreferencesSessionSnapshotStore(
             runningSinceBootMs = getLongOrNull("runningSinceBootMs"),
             nextReminderAtActiveMs = getLongOrNull("nextReminderAtActiveMs"),
             healthExerciseOwned = optBoolean("healthExerciseOwned", false),
+            pendingOperation = optString("pendingOperation").takeIf { it.isNotEmpty() }?.let(WearExternalOperation::valueOf),
+            pausedSinceBootMs = getLongOrNull("pausedSinceBootMs"),
+            intendedTerminalStatus = optString("intendedTerminalStatus").takeIf { it.isNotEmpty() }?.let(SessionStatus::valueOf),
         )
     }
 

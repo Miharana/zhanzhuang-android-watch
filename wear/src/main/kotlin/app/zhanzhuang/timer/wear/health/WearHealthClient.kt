@@ -40,6 +40,8 @@ interface WearHealthClient {
     suspend fun pause()
     suspend fun resume()
     suspend fun end()
+    /** Reattaches only when this app already owns an exercise; it must never start a new one. */
+    suspend fun reattach(): WearHealthStartResult = WearHealthStartResult.DurationOnly(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE)
 }
 
 /** Deliberately requests neither GPS nor any distance/calorie data. */

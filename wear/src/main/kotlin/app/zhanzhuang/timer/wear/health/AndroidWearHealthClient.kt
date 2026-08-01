@@ -99,6 +99,33 @@ class AndroidWearHealthClient(
         }
     }
 
+    override suspend fun reattach(): WearHealthStartResult {
+        try {
+            val existing = exerciseClient.getCurrentExerciseInfo().toExistingExercise()
+            if (existing != ExistingExercise.OWNED) {
+                ownsExercise = false
+                return WearHealthStartResult.DurationOnly(
+                    if (existing == ExistingExercise.OTHER_APP) DurationOnlyReason.OTHER_APP_EXERCISE
+                    else DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE,
+                )
+            }
+            ownsExercise = true
+            if (!exerciseClient.getCapabilities().supportsHeartRate()) {
+                return WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.HEART_RATE_UNAVAILABLE)
+            }
+            exerciseClient.setUpdateCallback(callback)
+            return WearHealthStartResult.Started
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: SecurityException) {
+            return if (ownsExercise) WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.PERMISSION_DENIED)
+            else WearHealthStartResult.DurationOnly(DurationOnlyReason.PERMISSION_DENIED)
+        } catch (error: HealthServicesException) {
+            return if (ownsExercise) WearHealthStartResult.StartedWithoutUpdates(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE)
+            else WearHealthStartResult.DurationOnly(DurationOnlyReason.HEALTH_SERVICES_UNAVAILABLE)
+        }
+    }
+
     private suspend fun afterCallbackRegistrationFailure(
         reason: DurationOnlyReason,
         startedExerciseInThisCall: Boolean,

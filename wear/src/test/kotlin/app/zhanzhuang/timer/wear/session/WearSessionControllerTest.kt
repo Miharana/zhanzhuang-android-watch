@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -128,6 +129,158 @@ class WearSessionControllerTest {
         assertTrue(haptics.cues.contains(Cue.COMPLETE).not())
     }
 
+    @Test
+    fun unchangedTerminalRecoveryDoesNotBumpRevision() = runTest {
+        val store = RecordingStore()
+        val snapshots = RecordingSnapshots().also {
+            it.save(WearSessionSnapshot(record(SessionStatus.COMPLETED).copy(revision = 7), "boot"))
+        }
+        val controller = controller(store, snapshots)
+
+        controller.recover("boot")
+
+        assertEquals(7, controller.state.value.record!!.revision)
+        assertEquals(7, store.latest()!!.revision)
+    }
+
+    @Test
+    fun startingRecoverySafelyCompletesStart() = runTest {
+        val health = RecordingHealth()
+        val controller = WearSessionControllerImpl(
+            RecordingStore(),
+            RecordingSnapshots().also { it.save(WearSessionSnapshot(record(SessionStatus.STARTING), "boot")) },
+            health,
+            AdjustableClock(),
+            RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+
+        assertEquals(SessionStatus.RUNNING, controller.state.value.record!!.status)
+        assertEquals(1, health.starts)
+    }
+
+    @Test
+    fun completingRecoveryEndsOwnedExerciseThenTerminalizes() = runTest {
+        val health = RecordingHealth()
+        val controller = WearSessionControllerImpl(
+            RecordingStore(),
+            RecordingSnapshots().also {
+                it.save(WearSessionSnapshot(record(SessionStatus.COMPLETING), "boot", healthExerciseOwned = true))
+            },
+            health,
+            AdjustableClock(),
+            RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+
+        assertTrue(health.ended)
+        assertEquals(1, health.starts)
+        assertEquals(SessionStatus.COMPLETED, controller.state.value.record!!.status)
+    }
+
+    @Test
+    fun completingCancellationRecoveryRemainsCancelled() = runTest {
+        val store = RecordingStore()
+        val controller = WearSessionControllerImpl(
+            store,
+            RecordingSnapshots().also {
+                it.save(
+                    WearSessionSnapshot(
+                        record(SessionStatus.COMPLETING), "boot",
+                        pendingOperation = WearExternalOperation.END,
+                        intendedTerminalStatus = SessionStatus.CANCELLED,
+                    ),
+                )
+            },
+            RecordingHealth(), AdjustableClock(), RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+
+        assertEquals(SessionStatus.CANCELLED, store.latest()!!.status)
+    }
+
+    @Test
+    fun pendingPauseRecoveryKeepsFrozenActiveDurationAndPauseAnchor() = runTest {
+        val clock = AdjustableClock().also { it.advanceBy(1_000) }
+        val store = RecordingStore()
+        val controller = WearSessionControllerImpl(
+            store,
+            RecordingSnapshots().also {
+                it.save(
+                    WearSessionSnapshot(
+                        record(SessionStatus.RUNNING).copy(activeDurationMs = 500), "boot",
+                        pendingOperation = WearExternalOperation.PAUSE,
+                        pausedSinceBootMs = 500,
+                    ),
+                )
+            },
+            RecordingHealth(), clock, RecordingHaptics(),
+        )
+
+        controller.recover("boot")
+
+        assertEquals(SessionStatus.PAUSED, store.latest()!!.status)
+        assertEquals(500, store.latest()!!.activeDurationMs)
+    }
+
+    @Test
+    fun heartRateUsesEventMonotonicTimestampAndOnlyRunningOwnedSession() = runTest {
+        val clock = AdjustableClock().also { it.advanceBy(500) }
+        val controller = WearSessionControllerImpl(
+            RecordingStore(), RecordingSnapshots(), RecordingHealth(), clock, RecordingHaptics(),
+        )
+        controller.start(SessionConfig(15, 5), "s1")
+        controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(63.0, timeSinceBootMs = 125))
+
+        assertEquals(1_125, controller.state.value.record!!.heartRateSamples.single().epochMillis)
+        controller.pause()
+        controller.acceptHealthUpdate(WearHealthUpdate.HeartRate(64.0, timeSinceBootMs = 200))
+        assertEquals(1, controller.state.value.record!!.heartRateSamples.size)
+    }
+
+    @Test
+    fun pauseAndResumeActionsAreParsed() {
+        assertEquals(WearSessionService.Command.Pause, WearSessionService.commandFrom(Intent(WearSessionService.ACTION_PAUSE)))
+        assertEquals(WearSessionService.Command.Resume, WearSessionService.commandFrom(Intent(WearSessionService.ACTION_RESUME)))
+    }
+
+    @Test
+    fun commandActorStopsStatusWhenNoDurableSessionExists() = runTest {
+        val result = WearSessionCommandProcessor(controller(RecordingStore(), RecordingSnapshots()))
+            .process(WearSessionService.Command.Status, "boot")
+
+        assertEquals(ServiceCommandResult.STOP, result)
+    }
+
+    @Test
+    fun commandActorRecoversBeforeRejectingASecondStart() = runTest {
+        val snapshots = RecordingSnapshots().also {
+            it.save(WearSessionSnapshot(record(SessionStatus.RUNNING), "boot", runningSinceBootMs = 0))
+        }
+        val processor = WearSessionCommandProcessor(controller(RecordingStore(), snapshots))
+
+        val result = processor.process(WearSessionService.Command.Start(SessionConfig(15, 5), "new"), "boot")
+
+        assertEquals(ServiceCommandResult.ACTIVE, result)
+    }
+
+    @Test
+    fun commandActorRecoversBeforeFinish() = runTest {
+        val store = RecordingStore()
+        val snapshots = RecordingSnapshots().also {
+            it.save(WearSessionSnapshot(record(SessionStatus.RUNNING), "boot", runningSinceBootMs = 0))
+        }
+
+        val result = WearSessionCommandProcessor(controller(store, snapshots))
+            .process(WearSessionService.Command.Finish, "boot")
+
+        assertEquals(ServiceCommandResult.STOP, result)
+        assertEquals(SessionStatus.COMPLETED, store.latest()!!.status)
+    }
+
     private fun record(
         status: SessionStatus,
         samples: List<HeartRateSample> = emptyList(),
@@ -144,6 +297,10 @@ class WearSessionControllerTest {
     private fun samples() = listOf(
         HeartRateSample(1_001, 60.0, SampleAccuracy.HIGH),
         HeartRateSample(1_002, 61.0, SampleAccuracy.HIGH),
+    )
+
+    private fun controller(store: RecordingStore, snapshots: RecordingSnapshots) = WearSessionControllerImpl(
+        store, snapshots, RecordingHealth(), AdjustableClock(), RecordingHaptics(), bootId = { "boot" },
     )
 
     private class AdjustableClock : WearSessionClock {
@@ -163,6 +320,11 @@ class WearSessionControllerTest {
         override suspend fun enqueueCompleted(eventId: String, sessionId: String, revision: Long, payload: String) {
             events += "outbox:$sessionId"
         }
+        override suspend fun completeWithOutbox(record: SessionRecord, eventId: String, payload: String) {
+            this.record = record
+            events += "persist:${record.status}"
+            events += "outbox:${record.id}"
+        }
         fun latest(): SessionRecord? = record
     }
 
@@ -177,11 +339,13 @@ class WearSessionControllerTest {
         private val startResult: WearHealthStartResult = WearHealthStartResult.Started,
     ) : WearHealthClient {
         var ended = false
+        var starts = 0
         override val updates: Flow<WearHealthUpdate> = emptyFlow()
-        override suspend fun start(): WearHealthStartResult = startResult
+        override suspend fun start(): WearHealthStartResult { starts += 1; return startResult }
         override suspend fun pause() = Unit
         override suspend fun resume() = Unit
         override suspend fun end() { ended = true; events += "health:end" }
+        override suspend fun reattach(): WearHealthStartResult { starts += 1; return startResult }
     }
 
     private class RecordingHaptics : HapticCuePlayer {
