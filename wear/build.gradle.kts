@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.health.services.client)
+    implementation(libs.androidx.wear.ongoing)
     ksp(libs.androidx.room.compiler)
 
     testImplementation(kotlin("test"))

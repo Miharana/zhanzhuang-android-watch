@@ -1,0 +1,59 @@
+package app.zhanzhuang.timer.wear.session
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import androidx.wear.ongoing.OngoingActivity
+
+/** Builds one truthful, non-dismissable notification and registers it as a Wear ongoing activity. */
+class OngoingSessionNotification(private val context: Context) {
+    fun build(state: WearSessionUiState?, touchIntent: PendingIntent): android.app.Notification {
+        ensureChannel()
+        val text = when (state?.record?.status) {
+            null, app.zhanzhuang.timer.model.SessionStatus.STARTING -> "Preparing your session"
+            app.zhanzhuang.timer.model.SessionStatus.RUNNING -> "Session in progress · ${formatRemaining(state.remainingMs)} remaining"
+            app.zhanzhuang.timer.model.SessionStatus.PAUSED -> "Session paused"
+            app.zhanzhuang.timer.model.SessionStatus.COMPLETING -> "Finishing session"
+            app.zhanzhuang.timer.model.SessionStatus.COMPLETED -> "Session complete"
+            app.zhanzhuang.timer.model.SessionStatus.CANCELLED -> "Session cancelled"
+            app.zhanzhuang.timer.model.SessionStatus.INTERRUPTED -> "Session interrupted"
+            else -> "Session status unavailable"
+        }
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Zhan Zhuang")
+            .setContentText(text)
+            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .setOngoing(state?.record?.status in ACTIVE_NOTIFICATION_STATUSES)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(touchIntent)
+        OngoingActivity.Builder(context, NOTIFICATION_ID, builder).build().apply(context)
+        return builder.build()
+    }
+
+    private fun ensureChannel() {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Training session", NotificationManager.IMPORTANCE_LOW),
+        )
+    }
+
+    private fun formatRemaining(remainingMs: Long): String {
+        val seconds = (remainingMs.coerceAtLeast(0) + 999) / 1_000
+        return "%d:%02d".format(seconds / 60, seconds % 60)
+    }
+
+    companion object {
+        const val CHANNEL_ID = "wear_session"
+        const val NOTIFICATION_ID = 501
+        private val ACTIVE_NOTIFICATION_STATUSES = setOf(
+            app.zhanzhuang.timer.model.SessionStatus.STARTING,
+            app.zhanzhuang.timer.model.SessionStatus.RUNNING,
+            app.zhanzhuang.timer.model.SessionStatus.PAUSED,
+            app.zhanzhuang.timer.model.SessionStatus.COMPLETING,
+        )
+    }
+}

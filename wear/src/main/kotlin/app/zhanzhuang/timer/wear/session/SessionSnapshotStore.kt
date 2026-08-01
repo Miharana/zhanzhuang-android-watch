@@ -1,0 +1,96 @@
+package app.zhanzhuang.timer.wear.session
+
+import android.content.SharedPreferences
+import app.zhanzhuang.timer.model.HeartRateSample
+import app.zhanzhuang.timer.model.SampleAccuracy
+import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionOwner
+import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** Durable process-recovery state. The boot ID prevents unsafe elapsed-time reconstruction after reboot. */
+data class WearSessionSnapshot(
+    val record: SessionRecord,
+    val bootId: String,
+    val runningSinceBootMs: Long? = null,
+    val nextReminderAtActiveMs: Long? = null,
+    val healthExerciseOwned: Boolean = false,
+)
+
+interface SessionSnapshotStore {
+    suspend fun save(snapshot: WearSessionSnapshot)
+    suspend fun load(): WearSessionSnapshot?
+}
+
+class SharedPreferencesSessionSnapshotStore(
+    private val preferences: SharedPreferences,
+) : SessionSnapshotStore {
+    override suspend fun save(snapshot: WearSessionSnapshot) {
+        preferences.edit().putString(KEY, snapshot.toJson().toString()).commit()
+    }
+
+    override suspend fun load(): WearSessionSnapshot? = preferences.getString(KEY, null)?.let { encoded ->
+        runCatching { JSONObject(encoded).toSnapshot() }.getOrNull()
+    }
+
+    private fun WearSessionSnapshot.toJson() = JSONObject().apply {
+        put("bootId", bootId)
+        put("runningSinceBootMs", runningSinceBootMs)
+        put("nextReminderAtActiveMs", nextReminderAtActiveMs)
+        put("healthExerciseOwned", healthExerciseOwned)
+        put("id", record.id)
+        put("revision", record.revision)
+        put("durationMinutes", record.config.durationMinutes)
+        put("intervalMinutes", record.config.intervalMinutes)
+        put("status", record.status.name)
+        put("startEpochMillis", record.startEpochMillis)
+        put("endEpochMillis", record.endEpochMillis)
+        put("activeDurationMs", record.activeDurationMs)
+        put("pausedDurationMs", record.pausedDurationMs)
+        put("samples", JSONArray().apply {
+            record.heartRateSamples.forEach { sample ->
+                put(JSONObject().apply {
+                    put("epochMillis", sample.epochMillis)
+                    put("bpm", sample.bpm)
+                    put("accuracy", sample.accuracy.name)
+                })
+            }
+        })
+    }
+
+    private fun JSONObject.toSnapshot(): WearSessionSnapshot {
+        val samples = getJSONArray("samples").let { array ->
+            List(array.length()) { index -> array.getJSONObject(index).let { value ->
+                HeartRateSample(
+                    epochMillis = value.getLong("epochMillis"),
+                    bpm = value.getDouble("bpm"),
+                    accuracy = SampleAccuracy.valueOf(value.getString("accuracy")),
+                )
+            } }
+        }
+        return WearSessionSnapshot(
+            record = SessionRecord(
+                id = getString("id"),
+                revision = getLong("revision"),
+                config = SessionConfig(getInt("durationMinutes"), getInt("intervalMinutes")),
+                status = SessionStatus.valueOf(getString("status")),
+                owner = SessionOwner.WEAR,
+                startEpochMillis = getLongOrNull("startEpochMillis"),
+                endEpochMillis = getLongOrNull("endEpochMillis"),
+                activeDurationMs = getLong("activeDurationMs"),
+                pausedDurationMs = getLong("pausedDurationMs"),
+                heartRateSamples = samples,
+            ),
+            bootId = getString("bootId"),
+            runningSinceBootMs = getLongOrNull("runningSinceBootMs"),
+            nextReminderAtActiveMs = getLongOrNull("nextReminderAtActiveMs"),
+            healthExerciseOwned = optBoolean("healthExerciseOwned", false),
+        )
+    }
+
+    private fun JSONObject.getLongOrNull(name: String): Long? = if (isNull(name)) null else getLong(name)
+
+    private companion object { const val KEY = "wear_session_snapshot_v1" }
+}
