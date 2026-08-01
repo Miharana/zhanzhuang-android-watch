@@ -86,7 +86,7 @@ require_permission_attribute() {
 
 reject_permission() {
     local xml=$1 permission=$2 subject=$3
-    expect_xml_count "$xml" "//*[local-name()='uses-permission' and @*[local-name()='name']='$permission']" 0 "$subject forbidden permission $permission"
+    expect_xml_count "$xml" "//*[starts-with(local-name(),'uses-permission') and @*[local-name()='name']='$permission']" 0 "$subject forbidden permission $permission"
 }
 
 inspect_apk() {

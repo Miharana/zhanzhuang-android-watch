@@ -25,6 +25,7 @@ Date: 2026-08-01
 - The mobile and Wear instrumentation flows now launch production `MainActivity` and drive real foreground-service paths. Mobile starts a disconnected phone-owned session, finishes it, recreates the activity, and checks the durable Room row. Wear starts the real service, pauses, resumes, confirms finish, recreates the activity, and checks the durable Wear Room row.
 - Fresh reruns: `:mobile:connectedDebugAndroidTest` passed 4 tests on the task-created Android 16/API 36 emulator; `:wear:connectedDebugAndroidTest` passed 5 tests on the task-created Wear OS 4/Android 13/API 33 round emulator. Both emulators were stopped afterward.
 - On the API 33 emulator, the test revokes `BODY_SENSORS` before launch but no duration-only permission surface appears; the exact test therefore proceeds through the real service path and does not claim the denied-permission UI was observed. This remains an explicit Wear permission-flow limitation, not a pass.
+- Privacy rejection now covers every `uses-permission*` manifest node, including `uses-permission-sdk-23`. The shell contract fixture exercises SDK-qualified INTERNET, fine/coarse location, and background-location declarations so none can bypass the release gate.
 
 ## Actual limitations
 
