@@ -174,15 +174,72 @@ class MobileSyncCoordinatorTest {
     @Test
     fun failedStateResponseDoesNotConsumeTheRemoteCommandEvent() = runTest {
         val transport = FakeTransport(messageResults = ArrayDeque(listOf(false, true)))
-        val controller = FakeController()
+        val controller = FakeController().also { it.seed(record(SessionOwner.MOBILE).copy(status = SessionStatus.STARTING)) }
         val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
         val start = envelope("retry-start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000L))
 
         assertFalse(coordinator.receiveCommand(start))
         assertTrue(coordinator.receiveCommand(start))
 
-        assertEquals(2, controller.remoteStarts)
+        assertEquals(1, controller.remoteStarts)
         assertEquals(2, transport.sentPayloadNames.count { it == "STATE" })
+    }
+
+    @Test
+    fun oldRevisionRetriesResendTheDurableTargetStateWithoutRepeatingRemoteActions() = runTest {
+        val transport = FakeTransport(messageResults = ArrayDeque(List(4) { listOf(false, true) }.flatten()))
+        val controller = FakeController().also { it.seed(record(SessionOwner.MOBILE).copy(status = SessionStatus.STARTING)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+        val start = envelope("start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000L))
+
+        assertFalse(coordinator.receiveCommand(start))
+        assertTrue(coordinator.receiveCommand(start))
+        val pause = envelope("pause", 2, SyncPayload.Pause)
+        assertFalse(coordinator.receiveCommand(pause))
+        assertTrue(coordinator.receiveCommand(pause))
+        val resume = envelope("resume", 3, SyncPayload.Resume)
+        assertFalse(coordinator.receiveCommand(resume))
+        assertTrue(coordinator.receiveCommand(resume))
+        val finish = envelope("finish", 4, SyncPayload.Finish(cancelled = false))
+        assertFalse(coordinator.receiveCommand(finish))
+        assertTrue(coordinator.receiveCommand(finish))
+
+        assertEquals(1, controller.remoteStarts)
+        assertEquals(1, controller.pauses)
+        assertEquals(1, controller.resumes)
+        assertEquals(1, controller.finishes)
+        assertEquals(5, controller.current()!!.revision)
+        assertEquals(SessionStatus.COMPLETED, controller.current()!!.status)
+        assertEquals(8, transport.sentPayloadNames.count { it == "STATE" })
+    }
+
+    @Test
+    fun cancelIfUnownedRetriesCancelledStateWithoutFinishingTwice() = runTest {
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false, true)))
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+        val cancel = envelope("cancel", 1, SyncPayload.CancelIfUnowned(ownerRevision = 1))
+
+        assertFalse(coordinator.receiveCommand(cancel))
+        assertTrue(coordinator.receiveCommand(cancel))
+
+        assertEquals(1, controller.finishes)
+        assertEquals(SessionStatus.CANCELLED, controller.current()!!.status)
+        assertEquals(2, controller.current()!!.revision)
+        assertEquals(2, transport.sentPayloadNames.count { it == "STATE" })
+    }
+
+    @Test
+    fun cancelIfUnownedRejectsWrongSessionAndNonterminalHigherRevision() = runTest {
+        val transport = FakeTransport()
+        val controller = FakeController().also { it.seed(record(SessionOwner.WEAR).copy(revision = 2)) }
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+
+        assertFalse(coordinator.receiveCommand(envelope("wrong", 1, SyncPayload.CancelIfUnowned(ownerRevision = 2)).copy(sessionId = "other")))
+        assertFalse(coordinator.receiveCommand(envelope("higher", 1, SyncPayload.CancelIfUnowned(ownerRevision = 1))))
+
+        assertEquals(0, controller.finishes)
+        assertTrue(transport.envelopes.isEmpty())
     }
 
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
@@ -214,12 +271,15 @@ class MobileSyncCoordinatorTest {
     }
 
     private class FakeController : MobileSyncController {
-        private var record = record(owner = SessionOwner.WEAR)
+        private var record = record(owner = SessionOwner.MOBILE)
         var remoteStarts = 0
+        var pauses = 0
+        var resumes = 0
+        var finishes = 0
 
         override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord {
             remoteStarts++
-            return record.copy(config = config, id = sessionId, revision = revision, owner = SessionOwner.MOBILE)
+            return record.copy(config = config, id = sessionId, revision = record.revision + 1, owner = SessionOwner.WEAR, status = SessionStatus.RUNNING)
                 .also { record = it }
         }
 
@@ -231,13 +291,23 @@ class MobileSyncCoordinatorTest {
 
         override suspend fun session(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }
 
-        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.PAUSED)?.also { record = it }
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.PAUSED, revision = record.revision + 1)?.also {
+            pauses++
+            record = it
+        }
 
-        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.RUNNING)?.also { record = it }
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(status = SessionStatus.RUNNING, revision = record.revision + 1)?.also {
+            resumes++
+            record = it
+        }
 
         override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(
             status = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED,
-        )?.also { record = it }
+            revision = record.revision + 1,
+        )?.also {
+            finishes++
+            record = it
+        }
 
         override suspend fun becomeMobileOwner(sessionId: String): SessionRecord? =
             record.takeIf { it.id == sessionId }?.copy(owner = SessionOwner.MOBILE, revision = record.revision + 1)
@@ -246,6 +316,7 @@ class MobileSyncCoordinatorTest {
         override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record.also { this.record = it }
 
         fun owner(): SessionOwner = record.owner
+        fun seed(record: SessionRecord) { this.record = record }
     }
 
     private companion object {

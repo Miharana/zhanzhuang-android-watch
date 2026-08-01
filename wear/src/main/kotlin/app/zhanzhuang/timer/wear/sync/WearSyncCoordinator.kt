@@ -62,9 +62,14 @@ class WearSyncCoordinator(
             SyncPayload.Resume -> if (rejectsLowerRevision(envelope, setOf(SessionStatus.RUNNING))) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } == true
             is SyncPayload.Finish -> if (rejectsLowerRevision(envelope, TERMINAL_STATUSES)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it, sourceNodeId) } == true
             is SyncPayload.CancelIfUnowned -> {
-                val current = controller?.current()
-                current != null && current.id == envelope.sessionId && current.revision <= payload.ownerRevision &&
-                    controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it, sourceNodeId) } == true
+                val current = controller?.session(envelope.sessionId)
+                when {
+                    current == null -> false
+                    current.status in TERMINAL_STATUSES -> current.revision > payload.ownerRevision && sendState(current, sourceNodeId)
+                    current.revision <= payload.ownerRevision ->
+                        controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it, sourceNodeId) } == true
+                    else -> false
+                }
             }
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> mergeRemote(payload.record)

@@ -5,6 +5,7 @@ import app.zhanzhuang.timer.model.PROTOCOL_VERSION
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.model.SyncEnvelope
 import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
@@ -66,21 +67,57 @@ class MobileSyncCoordinator(
         val handled = when (val payload = envelope.payload) {
             is SyncPayload.Start -> {
                 if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
-                if (isLowerRevision(envelope)) return false
-                val started = controller.startFromRemote(payload.config, envelope.sessionId, envelope.revision)
-                respond(envelope(started, SyncPayload.State(started)), sourceNodeId)
+                val current = controller.session(envelope.sessionId)
+                when {
+                    current?.status in TERMINAL_STATUSES -> false
+                    current?.owner == SessionOwner.WEAR && current.status in ACTIVE_STATUSES ->
+                        respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    isLowerRevision(envelope) -> false
+                    else -> {
+                        val started = controller.startFromRemote(payload.config, envelope.sessionId, envelope.revision)
+                        respond(envelope(started, SyncPayload.State(started)), sourceNodeId)
+                    }
+                }
             }
             SyncPayload.QueryState -> controller.current()?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> processCompleted(envelope, payload, sourceNodeId)
             is SyncPayload.Ack -> true
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller.pauseFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller.resumeFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+            SyncPayload.Pause -> {
+                val current = controller.session(envelope.sessionId)
+                when {
+                    current?.status == SessionStatus.PAUSED -> respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    rejectsLowerRevision(envelope, setOf(SessionStatus.PAUSED)) -> false
+                    else -> controller.pauseFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+                }
+            }
+            SyncPayload.Resume -> {
+                val current = controller.session(envelope.sessionId)
+                when {
+                    current?.status == SessionStatus.RUNNING -> respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    rejectsLowerRevision(envelope, setOf(SessionStatus.RUNNING)) -> false
+                    else -> controller.resumeFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+                }
+            }
+            is SyncPayload.Finish -> {
+                val expected = if (payload.cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED
+                val current = controller.session(envelope.sessionId)
+                when {
+                    current?.status == expected -> respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    rejectsLowerRevision(envelope, setOf(expected)) -> false
+                    else -> controller.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+                }
+            }
             is SyncPayload.CancelIfUnowned -> {
                 val current = controller.session(envelope.sessionId)
-                current != null && current.revision <= payload.ownerRevision &&
-                    controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+                when {
+                    current == null -> false
+                    current.status in TERMINAL_STATUSES -> current.revision > payload.ownerRevision &&
+                        respond(envelope(current, SyncPayload.State(current)), sourceNodeId)
+                    current.revision <= payload.ownerRevision ->
+                        controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+                    else -> false
+                }
             }
         }
         if (handled) rememberEvent(envelope.eventId)
@@ -135,6 +172,9 @@ class MobileSyncCoordinator(
     private suspend fun isLowerRevision(envelope: SyncEnvelope): Boolean =
         controller.session(envelope.sessionId)?.let { envelope.revision < it.revision } ?: false
 
+    private suspend fun rejectsLowerRevision(envelope: SyncEnvelope, idempotentStatuses: Set<SessionStatus>): Boolean =
+        controller.session(envelope.sessionId)?.let { envelope.revision < it.revision && it.status !in idempotentStatuses } ?: false
+
     private fun envelope(record: SessionRecord, payload: SyncPayload, eventId: String = UUID.randomUUID().toString()) = SyncEnvelope(
         eventId = eventId,
         sessionId = record.id,
@@ -148,5 +188,7 @@ class MobileSyncCoordinator(
         const val QUERY_TIMEOUT_MS = 5_000L
         const val START_EXPIRY_MS = ACK_TIMEOUT_MS + QUERY_TIMEOUT_MS
         const val MAX_SEEN_EVENTS = 512
+        val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }

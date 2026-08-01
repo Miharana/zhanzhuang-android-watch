@@ -72,6 +72,35 @@ class WearSyncCoordinatorTest {
         assertEquals(1, transport.messages.count { it.payload is SyncPayload.State })
     }
 
+    @Test
+    fun cancelIfUnownedRetriesTheTerminalStateWithoutFinishingTwice() = runTest {
+        val controller = CancellingController()
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false, true)))
+        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { 1_000 })
+        val cancel = envelope("cancel", 1, SyncPayload.CancelIfUnowned(ownerRevision = 1))
+
+        assertFalse(coordinator.receiveCommand(cancel))
+        assertTrue(coordinator.receiveCommand(cancel))
+
+        assertEquals(1, controller.finishCalls)
+        assertEquals(SessionStatus.CANCELLED, controller.current()!!.status)
+        assertEquals(2, controller.current()!!.revision)
+        assertEquals(2, transport.messages.count { it.payload is SyncPayload.State })
+    }
+
+    @Test
+    fun cancelIfUnownedRejectsWrongSessionAndNonterminalHigherRevision() = runTest {
+        val controller = CancellingController().also { it.setRevision(2) }
+        val transport = FakeTransport()
+        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { 1_000 })
+
+        assertFalse(coordinator.receiveCommand(envelope("wrong", 1, SyncPayload.CancelIfUnowned(ownerRevision = 2)).copy(sessionId = "other")))
+        assertFalse(coordinator.receiveCommand(envelope("higher", 1, SyncPayload.CancelIfUnowned(ownerRevision = 1))))
+
+        assertEquals(0, controller.finishCalls)
+        assertTrue(transport.messages.isEmpty())
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -90,12 +119,15 @@ class WearSyncCoordinatorTest {
         endEpochMillis = 2_000,
     )
 
-    private class FakeTransport(private val completedResult: Boolean = true) : SyncTransport {
+    private class FakeTransport(
+        private val completedResult: Boolean = true,
+        private val messageResults: ArrayDeque<Boolean> = ArrayDeque(),
+    ) : SyncTransport {
         var completedAttempts = 0
         val messages = mutableListOf<SyncEnvelope>()
         override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
             messages += envelope
-            return true
+            return messageResults.removeFirstOrNull() ?: true
         }
         override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {
             completedAttempts++
@@ -125,5 +157,31 @@ class WearSyncCoordinatorTest {
         override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
         override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = null
         override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record
+    }
+
+    private class CancellingController : WearSyncController {
+        private var record = SessionRecord(
+            id = "session-1",
+            revision = 1,
+            config = SessionConfig(),
+            status = SessionStatus.RUNNING,
+            owner = SessionOwner.WEAR,
+            startEpochMillis = 1_000,
+        )
+        var finishCalls = 0
+        override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord? = null
+        override suspend fun current(): SessionRecord? = record
+        override suspend fun session(sessionId: String): SessionRecord? = record.takeIf { it.id == sessionId }
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = record.takeIf { it.id == sessionId }?.copy(
+            status = if (cancelled) SessionStatus.CANCELLED else SessionStatus.COMPLETED,
+            revision = record.revision + 1,
+        )?.also {
+            finishCalls += 1
+            record = it
+        }
+        override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record
+        fun setRevision(revision: Long) { record = record.copy(revision = revision) }
     }
 }

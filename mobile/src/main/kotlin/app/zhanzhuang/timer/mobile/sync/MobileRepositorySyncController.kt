@@ -27,8 +27,13 @@ class MobileRepositorySyncController(
             startEpochMillis = nowEpochMillis(),
         ).also { repository.upsert(it) }
 
-    override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord =
-        mergeRemote(
+    override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord {
+        repository.get(sessionId)?.let { existing ->
+            if (existing.status in TERMINAL_STATUSES || (existing.owner == SessionOwner.WEAR && existing.status in ACTIVE_STATUSES)) {
+                return existing
+            }
+        }
+        return mergeRemote(
             SessionRecord(
             id = sessionId,
             revision = revision + 1,
@@ -38,6 +43,7 @@ class MobileRepositorySyncController(
             startEpochMillis = nowEpochMillis(),
             ),
         )
+    }
 
     override suspend fun current(): SessionRecord? = repository.activeSession()
 
@@ -93,7 +99,9 @@ class MobileRepositorySyncController(
     }
 
     private suspend fun transitionActive(sessionId: String, status: SessionStatus): SessionRecord? {
-        val active = repository.activeSession()?.takeIf { it.id == sessionId } ?: return null
+        val active = repository.get(sessionId) ?: return null
+        if (active.status == status) return active
+        if (active.status in TERMINAL_STATUSES || active.status !in ACTIVE_STATUSES) return null
         return active.copy(
             status = status,
             revision = active.revision + 1,
@@ -109,5 +117,10 @@ class MobileRepositorySyncController(
                 context.startService(android.content.Intent(context, MobileSessionService::class.java).setAction(action))
             }
         }
+    }
+
+    private companion object {
+        val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }
