@@ -65,12 +65,14 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
 - [ ] The signed candidate hashes and this attempt are recorded in
   `internal-release-evidence.md`. No production release, track, metadata, or
   binary was committed.
-- [x] A later read-only access audit exhausted both gcloud user credential
-  paths and the available repository-external service account without opening
-  an edit. The service account still reads its known control package (HTTP 200)
-  but the target returns HTTP 404; both user tokens return 403 for both
-  packages. The live Console remains at the account-type step of developer
-  account signup, with no form submission or billing/account mutation.
+- [x] A later read-only access audit exhausted the current ADC, two non-active
+  legacy ADC files, the active gcloud user token, and both discovered
+  repository-external service-account paths without opening an edit. All user
+  tokens return 403 for the target and control packages. The two service-account
+  files are byte-identical; that single credential reads its known control
+  package (HTTP 200) but the target returns HTTP 404. The live Console remains
+  at the account-type step of developer account signup, with no form submission
+  or billing/account mutation.
 - [x] The account-type decision is resolved: use an organisation account because
   this app tracks/exports wellness and heart-rate information and therefore
   falls within Google Play's Health apps scope. The owner still has to supply

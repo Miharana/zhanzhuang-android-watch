@@ -125,18 +125,22 @@ Once an authenticated developer dashboard is available, the continuation is:
 The persistent release goal rechecked every locally available owner and service
 credential without opening a Publisher edit:
 
-- Google Application Default Credentials are present, can mint an access token,
-  and the token has the Android Publisher OAuth scope. The read-only
-  `reviews.list` endpoint returned `403 PERMISSION_DENIED` for both
-  `app.zhanzhuang.timer` and the known Miharana control package.
+- Three repository-external Google user ADC JSON paths were located: the current
+  Application Default Credentials file and two non-active legacy copies. Each
+  could mint a token, and each returned `403 PERMISSION_DENIED` from the
+  read-only `reviews.list` endpoint for both `app.zhanzhuang.timer` and the
+  known Miharana control package. The current ADC token was separately confirmed
+  to include the Android Publisher OAuth scope.
 - The currently active gcloud user token returned the same `403` result for
-  both packages. These two user credential paths therefore have no usable app
-  access in the current Play developer account.
-- The repository-external Miharana service-account credential returned HTTP 200
-  for the known Miharana control package and HTTP 404 for
-  `app.zhanzhuang.timer` through the same read-only `reviews.list` request. This
-  reconfirms that the credential itself is functional while the target package
-  remains absent from or unavailable to that Play account.
+  both packages. All discovered user credential paths therefore have no usable
+  app access in the current Play developer account.
+- Two repository-external Miharana service-account JSON paths were discovered
+  and verified to be byte-identical, so they represent one distinct credential,
+  not two authorization routes. That credential returned HTTP 200 for the known
+  Miharana control package and HTTP 404 for `app.zhanzhuang.timer` through the
+  same read-only `reviews.list` request. This reconfirms that the credential is
+  functional while the target package remains absent from or unavailable to
+  that Play account.
 - A fresh, read-only Chrome snapshot still shows **Creating a Play Console
   developer account** at `https://play.google.com/console/signup`. The page is
   waiting for an organisation-versus-personal account decision before identity,
