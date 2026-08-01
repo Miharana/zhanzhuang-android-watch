@@ -18,6 +18,14 @@ Date: 2026-08-01
 - `:mobile:connectedDebugAndroidTest` passed 4 tests on a task-created Android 16 / API 36 phone emulator.
 - The collector generated anonymized evidence only: `connected-device-1`, OS/API, broad form factor, installed version, permissions, foreground-service/notification state, and no health samples.
 
+## Review follow-up — 2026-08-01
+
+- Collector discovery now streams `adb devices -l` through process substitution; raw serials exist only in shell memory and are never written to a temporary file, stdout, or evidence markdown.
+- The release gate now checks fresh debug APKs plus fresh release merged manifests. It requires artifact `compileSdkVersion=36`, debug identity `app.zhanzhuang.timer.debug`, release identity `app.zhanzhuang.timer`, exact watch feature/standalone metadata, complete mobile/Wear health and foreground permission sets, API constraints, launcher icons, locales, and no Internet or location permissions.
+- The mobile and Wear instrumentation flows now launch production `MainActivity` and drive real foreground-service paths. Mobile starts a disconnected phone-owned session, finishes it, recreates the activity, and checks the durable Room row. Wear starts the real service, pauses, resumes, confirms finish, recreates the activity, and checks the durable Wear Room row.
+- Fresh reruns: `:mobile:connectedDebugAndroidTest` passed 4 tests on the task-created Android 16/API 36 emulator; `:wear:connectedDebugAndroidTest` passed 5 tests on the task-created Wear OS 4/Android 13/API 33 round emulator. Both emulators were stopped afterward.
+- On the API 33 emulator, the test revokes `BODY_SENSORS` before launch but no duration-only permission surface appears; the exact test therefore proceeds through the real service path and does not claim the denied-permission UI was observed. This remains an explicit Wear permission-flow limitation, not a pass.
+
 ## Actual limitations
 
 - These are local emulator runs, not physical-device or Google Play/Internal-test evidence.

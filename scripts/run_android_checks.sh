@@ -47,6 +47,7 @@ resolve_java_home() {
 export JAVA_HOME=$(resolve_java_home)
 export PATH="$JAVA_HOME/bin:$PATH"
 need_command java
+need_command xmllint
 
 marker=$(mktemp "${TMPDIR:-/tmp}/zhan-zhuang-android-checks.XXXXXX")
 trap 'rm -f "$marker"' EXIT
@@ -57,7 +58,8 @@ printf 'Running Android unit tests, lint, and debug assemblies (without Gradle c
     :core:model:test :core:domain:test \
     :mobile:test :wear:test \
     :mobile:lintDebug :wear:lintDebug \
-    :mobile:assembleDebug :wear:assembleDebug
+    :mobile:assembleDebug :wear:assembleDebug \
+    :mobile:processReleaseManifest :wear:processReleaseManifest
 
 mobile_apk="$repo_root/mobile/build/outputs/apk/debug/mobile-debug.apk"
 wear_apk="$repo_root/wear/build/outputs/apk/debug/wear-debug.apk"
@@ -66,41 +68,89 @@ for apk in "$mobile_apk" "$wear_apk"; do
     [[ "$apk" -nt "$marker" ]] || fail "debug APK was not freshly produced during this run: $apk"
 done
 
+expect_xml_count() {
+    local xml=$1 xpath=$2 expected=$3 subject=$4 actual
+    actual=$(printf '%s' "$xml" | xmllint --xpath "count($xpath)" - 2>/dev/null) || fail "$subject: XML query failed"
+    [[ "$actual" == "$expected" ]] || fail "$subject: expected $expected matching XML element(s), got $actual"
+}
+
+require_permission() {
+    local xml=$1 permission=$2 subject=$3
+    expect_xml_count "$xml" "//*[local-name()='uses-permission' and @*[local-name()='name']='$permission']" 1 "$subject permission $permission"
+}
+
+require_permission_attribute() {
+    local xml=$1 permission=$2 attribute=$3 value=$4 subject=$5
+    expect_xml_count "$xml" "//*[local-name()='uses-permission' and @*[local-name()='name']='$permission' and @*[local-name()='$attribute']='$value']" 1 "$subject permission $permission@$attribute"
+}
+
+reject_permission() {
+    local xml=$1 permission=$2 subject=$3
+    expect_xml_count "$xml" "//*[local-name()='uses-permission' and @*[local-name()='name']='$permission']" 0 "$subject forbidden permission $permission"
+}
+
 inspect_apk() {
     local module=$1 apk=$2 min_sdk=$3 version_code=$4
-    local application_id badging manifest resources
+    local application_id badging manifest xmltree resources
     application_id=$("$apkanalyzer" manifest application-id "$apk") || fail "$module: apkanalyzer could not read $apk"
     [[ "$application_id" == 'app.zhanzhuang.timer.debug' ]] || fail "$module: expected debug application ID app.zhanzhuang.timer.debug, got $application_id"
     badging=$("$aapt" dump badging "$apk") || fail "$module: aapt could not inspect $apk"
     manifest=$("$apkanalyzer" manifest print "$apk") || fail "$module: apkanalyzer could not print manifest"
+    xmltree=$("$aapt" dump xmltree "$apk" AndroidManifest.xml) || fail "$module: aapt could not inspect manifest tree"
     resources=$("$aapt" dump --values resources "$apk") || fail "$module: aapt could not inspect resources"
     expect_contains "$badging" "versionCode='$version_code'" "$module badging"
     expect_contains "$badging" "versionName='0.1.0'" "$module badging"
+    expect_contains "$badging" "compileSdkVersion='36'" "$module badging"
     expect_contains "$badging" "sdkVersion:'$min_sdk'" "$module badging"
     expect_contains "$badging" "targetSdkVersion:'36'" "$module badging"
     expect_contains "$badging" "application-icon-" "$module badging (launcher icon)"
     expect_contains "$resources" 'config zh-rCN' "$module resources (Chinese locale)"
-    expect_absent "$manifest" 'android.permission.INTERNET' "$module manifest"
-    expect_absent "$manifest" 'android.permission.ACCESS_FINE_LOCATION' "$module manifest"
-    expect_absent "$manifest" 'android.permission.ACCESS_COARSE_LOCATION' "$module manifest"
-    printf 'Verified %s: %s\n' "$module" "$apk"
+    expect_contains "$xmltree" 'E: manifest' "$module manifest tree"
+    reject_permission "$manifest" 'android.permission.INTERNET' "$module"
+    reject_permission "$manifest" 'android.permission.ACCESS_FINE_LOCATION' "$module"
+    reject_permission "$manifest" 'android.permission.ACCESS_COARSE_LOCATION' "$module"
+    reject_permission "$manifest" 'android.permission.ACCESS_BACKGROUND_LOCATION' "$module"
+    printf 'Verified %s: %s\n' "$module" "$apk" >&2
     printf '%s\n' "$manifest"
 }
 
 mobile_manifest=$(inspect_apk mobile "$mobile_apk" 28 1000001)
-expect_contains "$mobile_manifest" 'android.permission.FOREGROUND_SERVICE' 'mobile manifest'
-expect_contains "$mobile_manifest" 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE' 'mobile manifest'
-expect_contains "$mobile_manifest" 'android.permission.health.WRITE_MINDFULNESS' 'mobile manifest'
-expect_contains "$mobile_manifest" 'foregroundServiceType="0x40000000"' 'mobile manifest (special-use foreground service)'
-expect_contains "$mobile_manifest" 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE' 'mobile manifest (special-use justification)'
+for permission in \
+    android.permission.FOREGROUND_SERVICE \
+    android.permission.FOREGROUND_SERVICE_SPECIAL_USE \
+    android.permission.POST_NOTIFICATIONS \
+    android.permission.health.WRITE_EXERCISE \
+    android.permission.health.WRITE_HEART_RATE \
+    android.permission.health.WRITE_MINDFULNESS; do
+    require_permission "$mobile_manifest" "$permission" mobile
+done
+expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService' and @*[local-name()='foregroundServiceType']='0x40000000']" 1 'mobile special-use service'
+expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService']/*[local-name()='property' and @*[local-name()='name']='android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE' and @*[local-name()='value']='standing_meditation_timer']" 1 'mobile special-use justification'
 
 wear_manifest=$(inspect_apk wear "$wear_apk" 33 2000001)
-expect_contains "$wear_manifest" 'android.hardware.type.watch' 'Wear manifest (watch form factor)'
-expect_contains "$wear_manifest" 'com.google.android.wearable.standalone' 'Wear manifest'
-expect_contains "$wear_manifest" 'android:value="true"' 'Wear manifest (standalone)'
-expect_contains "$wear_manifest" 'android.permission.FOREGROUND_SERVICE_HEALTH' 'Wear manifest'
-expect_contains "$wear_manifest" 'android.permission.health.READ_HEART_RATE' 'Wear manifest'
-expect_contains "$wear_manifest" 'android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND' 'Wear manifest'
-expect_contains "$wear_manifest" 'foregroundServiceType="0x100"' 'Wear manifest (health foreground service)'
+expect_xml_count "$wear_manifest" "//*[local-name()='uses-feature' and @*[local-name()='name']='android.hardware.type.watch' and @*[local-name()='required']='true']" 1 'Wear watch form factor'
+expect_xml_count "$wear_manifest" "//*[local-name()='application']/*[local-name()='meta-data' and @*[local-name()='name']='com.google.android.wearable.standalone' and @*[local-name()='value']='true']" 1 'Wear standalone metadata'
+for permission in \
+    android.permission.FOREGROUND_SERVICE \
+    android.permission.FOREGROUND_SERVICE_HEALTH \
+    android.permission.POST_NOTIFICATIONS \
+    android.permission.VIBRATE \
+    android.permission.health.READ_HEART_RATE \
+    android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND; do
+    require_permission "$wear_manifest" "$permission" Wear
+done
+require_permission_attribute "$wear_manifest" android.permission.BODY_SENSORS maxSdkVersion 35 Wear
+require_permission_attribute "$wear_manifest" android.permission.BODY_SENSORS_BACKGROUND maxSdkVersion 35 Wear
+require_permission_attribute "$wear_manifest" android.permission.health.READ_HEART_RATE minSdkVersion 36 Wear
+require_permission_attribute "$wear_manifest" android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND minSdkVersion 36 Wear
+expect_xml_count "$wear_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.wear.session.WearSessionService' and @*[local-name()='foregroundServiceType']='0x100']" 1 'Wear health foreground service'
+
+for module in mobile wear; do
+    release_manifest="$repo_root/$module/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml"
+    [[ -s "$release_manifest" ]] || fail "$module: missing release merged manifest: $release_manifest"
+    [[ "$release_manifest" -nt "$marker" ]] || fail "$module: release merged manifest was not freshly produced during this run: $release_manifest"
+    release_application_id=$(xmllint --xpath 'string(/*[local-name()="manifest"]/@package)' "$release_manifest" 2>/dev/null) || fail "$module: release manifest is not parseable"
+    [[ "$release_application_id" == 'app.zhanzhuang.timer' ]] || fail "$module: expected release application ID app.zhanzhuang.timer, got $release_application_id"
+done
 
 printf 'PASS: Android and Wear debug release contracts verified.\n'

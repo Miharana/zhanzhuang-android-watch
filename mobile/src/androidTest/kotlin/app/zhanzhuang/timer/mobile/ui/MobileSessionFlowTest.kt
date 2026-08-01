@@ -1,55 +1,55 @@
 package app.zhanzhuang.timer.mobile.ui
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.zhanzhuang.timer.mobile.ui.screens.TrainingScreen
-import app.zhanzhuang.timer.model.SessionOwner
-import app.zhanzhuang.timer.model.SessionRecord
-import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.mobile.MainActivity
+import app.zhanzhuang.timer.mobile.data.MobileDatabase
+import app.zhanzhuang.timer.mobile.session.MobileSessionService
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** User-visible setup → running → pause → resume → completed flow without device-only claims. */
+/** Exercises the installed activity, its ViewModel/coordinator, and the real phone FGS; no callback injection. */
 @RunWith(AndroidJUnit4::class)
 class MobileSessionFlowTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
-    @Test fun session_controls_complete_one_local_phone_session() {
-        rule.setContent {
-            var state by remember { mutableStateOf(TrainingUiState(watchConnected = false)) }
-            fun running(status: SessionStatus) = state.copy(
-                session = SessionRecord(status = status, owner = SessionOwner.MOBILE),
-                remainingMs = 30 * 60_000L,
-            )
-            TrainingScreen(
-                state = state,
-                onDurationChange = { state = state.copy(config = state.config.copy(durationMinutes = it)) },
-                onIntervalChange = { state = state.copy(config = state.config.copy(intervalMinutes = it)) },
-                onStart = { state = running(SessionStatus.RUNNING) },
-                onPause = { state = running(SessionStatus.PAUSED) },
-                onResume = { state = running(SessionStatus.RUNNING) },
-                onFinish = { state = state.copy(session = state.session?.copy(status = SessionStatus.COMPLETED)) },
-                onCancel = { state = state.copy(session = state.session?.copy(status = SessionStatus.CANCELLED)) },
-            )
-        }
+    @After fun stopRealServiceAndRemoveTestDatabase() {
+        rule.activity.stopService(android.content.Intent(rule.activity, MobileSessionService::class.java))
+        rule.activity.deleteDatabase("zhan_zhuang.db")
+    }
 
+    @Test fun disconnected_phone_start_finishes_and_is_visible_in_history() {
         rule.onNodeWithText("Start standing").performClick()
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Standing").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Standing").assertIsDisplayed()
-        rule.onNodeWithText("Pause").performClick()
-        rule.onNodeWithText("Paused").assertIsDisplayed()
-        rule.onNodeWithText("Resume").performClick()
+
         rule.onNodeWithText("End session").performClick()
         rule.onNodeWithText("End this session?").assertIsDisplayed()
         rule.onAllNodesWithText("End session")[1].performClick()
-        rule.onNodeWithText("Completed").assertIsDisplayed()
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Completed").fetchSemanticsNodes().isNotEmpty() }
+
+        rule.runOnUiThread { rule.activity.recreate() }
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Completed").fetchSemanticsNodes().isNotEmpty() }
+        assertCompletedRecordIsDurable()
+    }
+
+    private fun assertCompletedRecordIsDurable() = runBlocking {
+        val database = Room.databaseBuilder(rule.activity, MobileDatabase::class.java, "zhan_zhuang.db").build()
+        try {
+            val records = withTimeout(10_000) { database.sessionDao().observeAll().first { it.isNotEmpty() } }
+            check(records.single().status == "COMPLETED") { "expected durable COMPLETED record, got ${records.map { it.status }}" }
+        } finally {
+            database.close()
+        }
     }
 }

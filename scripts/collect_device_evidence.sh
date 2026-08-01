@@ -32,14 +32,10 @@ if [[ -n "$output_path" ]]; then
     fi
 fi
 
-raw_devices=$(mktemp "${TMPDIR:-/tmp}/zhan-zhuang-adb-devices.XXXXXX")
-trap 'rm -f "$raw_devices"' EXIT
-adb devices -l >"$raw_devices" 2>/dev/null || fail 'adb server is unavailable. Start platform-tools adb and retry.'
-
 declare -a serials=()
 while IFS=$'\t' read -r serial state _; do
     [[ "$state" == device ]] && serials+=("$serial")
-done < <(awk 'NR > 1 && $2 == "device" { print $1 "\t" $2 }' "$raw_devices")
+done < <(adb devices -l 2>/dev/null | awk 'NR > 1 && $2 == "device" { print $1 "\t" $2 }')
 
 lines=()
 append() { lines+=("$1"); }

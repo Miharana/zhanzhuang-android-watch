@@ -6,8 +6,8 @@ Status key: `Pass` requires directly observed evidence on the stated device clas
 | --- | --- | --- | --- | --- | --- | --- |
 | Android 9 / API 28 | Phone | No task AVD/image run | Not run | Not run | Not run | Blocked — no local API 28 image |
 | Android 14 / API 34 | Phone | No task AVD/image run | Not run | Not run | Not run | Blocked — no local API 34 phone run |
-| Android 16 / API 36 | Phone emulator | Task-created local Pixel 8 AVD; anonymized record in `local-phone-device-evidence-2026-08-01.md` | `:mobile:connectedDebugAndroidTest`: 4 tests passed | Not run | Not run; no paired Wear or Health Connect claim | Partial emulator evidence only |
-| Task 10 Wear OS 4 / Android 13 API 33 | Round Wear emulator | Task-created local AVD; anonymized record in `local-device-evidence-2026-08-01.md` | `:wear:connectedDebugAndroidTest`: 5 tests passed | Not run | Not run; no paired phone or sensor evidence | Partial emulator evidence only |
+| Android 16 / API 36 | Phone emulator | Task-created local Pixel 8 AVD; anonymized record in `local-phone-device-evidence-2026-08-01.md` | 4 tests passed; real activity → ViewModel → FGS → Room completion/recreate path | Not run | No paired Wear or Health Connect claim | Partial emulator evidence only |
+| Task 10 Wear OS 4 / Android 13 API 33 | Round Wear emulator | Task-created local AVD; anonymized record in `local-device-evidence-2026-08-01.md` | 5 tests passed; real activity → FGS pause/resume/finish → Room completion/recreate path | Not run | Permission-denied/duration-only surface was not observed after runtime revoke; no sensor/paired-phone claim | Partial emulator evidence only |
 | Wear OS 5 / API 34 | Round Wear emulator | No AVD/image run | Not run | Not run | Not run | Blocked — no run in this task |
 | Wear OS 6 / API 36 | Round Wear emulator | No AVD/image run | Not run | Not run | Not run | Blocked — no run in this task |
 | Pixel Watch 4 | Physical round watch | No physical device attached | Not run | Not run | Not run | Blocked — requires physical device |
