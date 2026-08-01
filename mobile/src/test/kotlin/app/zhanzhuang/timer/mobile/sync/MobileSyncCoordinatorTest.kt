@@ -97,6 +97,18 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun sameCompletedEventRetriesAckAfterTransportFailure() = runTest {
+        val transport = FakeTransport(ackResults = ArrayDeque(listOf(false, true)))
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 10_000L })
+        val completed = envelope("completion-retry", 4, SyncPayload.Completed(record(SessionOwner.WEAR).copy(revision = 4, status = SessionStatus.COMPLETED)))
+
+        assertFalse(coordinator.receiveCompleted(completed))
+        assertTrue(coordinator.receiveCompleted(completed))
+        assertEquals(2, transport.sentPayloadNames.count { it == "ACK" })
+    }
+
+    @Test
     fun wrongSessionPauseCannotOperateCurrentSession() = runTest {
         val controller = FakeController()
         val coordinator = MobileSyncCoordinator(FakeTransport(), controller, this, nowEpochMillis = { 10_000L })
@@ -167,14 +179,14 @@ class MobileSyncCoordinatorTest {
         payload = payload,
     )
 
-    private class FakeTransport : SyncTransport {
+    private class FakeTransport(private val ackResults: ArrayDeque<Boolean> = ArrayDeque()) : SyncTransport {
         val sentPayloadNames = mutableListOf<String>()
         val envelopes = mutableListOf<SyncEnvelope>()
 
         override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
             sentPayloadNames += envelope.payload::class.simpleName!!.replace("QueryState", "QUERY_STATE").uppercase()
             envelopes += envelope
-            return true
+            return if (envelope.payload is SyncPayload.Ack && ackResults.isNotEmpty()) ackResults.removeFirst() else true
         }
 
         override suspend fun putCompleted(envelope: SyncEnvelope): Boolean = true

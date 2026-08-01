@@ -118,6 +118,7 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
     override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {
         val request = PutDataMapRequest.create("$PATH_COMPLETED/${envelope.eventId}").apply {
             dataMap.putByteArray(SyncWireCodec.DATA_KEY_ENVELOPE, SyncWireCodec.encodeCompleted(envelope))
+            dataMap.putLong("delivery_attempt", System.nanoTime())
         }.asPutDataRequest().setUrgent()
         return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getDataClient(appContext).putDataItem(request).await() } != null }.getOrDefault(false)
     }

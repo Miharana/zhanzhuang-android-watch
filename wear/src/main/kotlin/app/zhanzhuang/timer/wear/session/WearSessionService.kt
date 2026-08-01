@@ -115,7 +115,16 @@ class WearSessionService : Service() {
                     publishForeground(request.generation)
                     startTicker(request.startId, request.generation)
                 }
-                ServiceCommandResult.STOP, ServiceCommandResult.REJECTED -> stopIfCurrent(request.startId, request.generation)
+                ServiceCommandResult.STOP -> stopIfCurrent(request.startId, request.generation)
+                ServiceCommandResult.REJECTED -> {
+                    // A stale remote command must never tear down a different valid session.
+                    if (controller.state.value.record?.status in ACTIVE_STATUSES) {
+                        publishForeground(request.generation)
+                        startTicker(request.startId, request.generation)
+                    } else {
+                        stopIfCurrent(request.startId, request.generation)
+                    }
+                }
             }
             is ServiceRequest.Tick -> if (request.generation == generation.get()) {
                 controller.tick()

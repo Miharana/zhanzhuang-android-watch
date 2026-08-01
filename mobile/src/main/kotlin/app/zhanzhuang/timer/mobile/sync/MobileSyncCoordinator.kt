@@ -89,7 +89,9 @@ class MobileSyncCoordinator(
     }
 
     suspend fun receiveCompleted(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
-        if (!acceptEnvelope(envelope)) return false
+        // A lost ACK must be recoverable even when this process has already
+        // seen the event ID. Repository/revision merge is the durable guard.
+        if (envelope.protocolVersion != PROTOCOL_VERSION || envelope.eventId.isBlank()) return false
         val completed = envelope.payload as? SyncPayload.Completed ?: return false
         return processCompleted(envelope, completed, sourceNodeId)
     }
