@@ -4,6 +4,7 @@ import app.zhanzhuang.timer.domain.SyncConflictResolver
 import app.zhanzhuang.timer.model.PROTOCOL_VERSION
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.model.SyncEnvelope
 import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
@@ -47,25 +48,29 @@ class WearSyncCoordinator(
     private val mutex = Mutex()
 
     suspend fun receiveCommand(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
-        if (!acceptEnvelope(envelope)) return false
-        return when (val payload = envelope.payload) {
+        if (!isValidUnseenEnvelope(envelope)) return false
+        val handled = when (val payload = envelope.payload) {
             is SyncPayload.Ack -> acknowledge(envelope.eventId, envelope.sessionId, envelope.revision, payload.acceptedRevision)
             is SyncPayload.Start -> {
                 if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
-                if (isLowerRevision(envelope)) return false
-                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it, sourceNodeId) } != null
+                // A matching durable ID is an idempotent replay, even when the
+                // actor has already advanced its revision after the first try.
+                controller?.startFromRemote(payload.config, envelope.sessionId, envelope.revision)?.let { sendState(it, sourceNodeId) } == true
             }
-            SyncPayload.QueryState -> controller?.current()?.let { sendState(it, sourceNodeId) } != null
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } != null
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } != null
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it, sourceNodeId) } != null
+            SyncPayload.QueryState -> controller?.current()?.let { sendState(it, sourceNodeId) } == true
+            SyncPayload.Pause -> if (rejectsLowerRevision(envelope, setOf(SessionStatus.PAUSED))) false else controller?.pauseFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } == true
+            SyncPayload.Resume -> if (rejectsLowerRevision(envelope, setOf(SessionStatus.RUNNING))) false else controller?.resumeFromRemote(envelope.sessionId)?.let { sendState(it, sourceNodeId) } == true
+            is SyncPayload.Finish -> if (rejectsLowerRevision(envelope, TERMINAL_STATUSES)) false else controller?.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { sendState(it, sourceNodeId) } == true
             is SyncPayload.CancelIfUnowned -> {
-                val current = controller?.current() ?: return false
-                if (current.id == envelope.sessionId && current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it, sourceNodeId) } != null else false
+                val current = controller?.current()
+                current != null && current.id == envelope.sessionId && current.revision <= payload.ownerRevision &&
+                    controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { sendState(it, sourceNodeId) } == true
             }
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> mergeRemote(payload.record)
         }
+        if (handled) rememberEvent(envelope.eventId)
+        handled
     }
 
     suspend fun resendCompleted(): Boolean = mutex.withLock {
@@ -106,18 +111,22 @@ class WearSyncCoordinator(
     private suspend fun respond(envelope: SyncEnvelope, sourceNodeId: String?): Boolean =
         if (sourceNodeId == null) transport.sendMessage(envelope) else transport.sendMessageTo(envelope, sourceNodeId)
 
-    private fun acceptEnvelope(envelope: SyncEnvelope): Boolean {
+    private fun isValidUnseenEnvelope(envelope: SyncEnvelope): Boolean {
         if (envelope.protocolVersion != PROTOCOL_VERSION || envelope.eventId.isBlank()) return false
-        if (!seenEventIds.add(envelope.eventId)) return false
-        while (seenEventIds.size > MAX_SEEN_EVENTS) seenEventIds.remove(seenEventIds.first())
-        return true
+        return envelope.eventId !in seenEventIds
     }
 
-    private suspend fun isLowerRevision(envelope: SyncEnvelope): Boolean =
-        controller?.session(envelope.sessionId)?.let { envelope.revision < it.revision } ?: false
+    private fun rememberEvent(eventId: String) {
+        seenEventIds += eventId
+        while (seenEventIds.size > MAX_SEEN_EVENTS) seenEventIds.remove(seenEventIds.first())
+    }
+
+    private suspend fun rejectsLowerRevision(envelope: SyncEnvelope, idempotentStatuses: Set<SessionStatus>): Boolean =
+        controller?.session(envelope.sessionId)?.let { envelope.revision < it.revision && it.status !in idempotentStatuses } ?: false
 
     private companion object {
         const val MAX_SEEN_EVENTS = 512
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }
 

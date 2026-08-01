@@ -62,30 +62,29 @@ class MobileSyncCoordinator(
     }
 
     suspend fun receiveCommand(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
-        if (!acceptEnvelope(envelope)) return false
-        return when (val payload = envelope.payload) {
+        if (!isValidUnseenEnvelope(envelope)) return false
+        val handled = when (val payload = envelope.payload) {
             is SyncPayload.Start -> {
                 if (payload.expiresAtEpochMillis <= nowEpochMillis()) return false
                 if (isLowerRevision(envelope)) return false
                 val started = controller.startFromRemote(payload.config, envelope.sessionId, envelope.revision)
                 respond(envelope(started, SyncPayload.State(started)), sourceNodeId)
-                true
             }
-            SyncPayload.QueryState -> {
-                controller.current()?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) }
-                true
-            }
+            SyncPayload.QueryState -> controller.current()?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
             is SyncPayload.State -> mergeRemote(payload.record)
             is SyncPayload.Completed -> processCompleted(envelope, payload, sourceNodeId)
             is SyncPayload.Ack -> true
-            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller.pauseFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } != null
-            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller.resumeFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } != null
-            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } != null
+            SyncPayload.Pause -> if (isLowerRevision(envelope)) false else controller.pauseFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+            SyncPayload.Resume -> if (isLowerRevision(envelope)) false else controller.resumeFromRemote(envelope.sessionId)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
+            is SyncPayload.Finish -> if (isLowerRevision(envelope)) false else controller.finishFromRemote(envelope.sessionId, payload.cancelled)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
             is SyncPayload.CancelIfUnowned -> {
-                val current = controller.session(envelope.sessionId) ?: return false
-                if (current.revision <= payload.ownerRevision) controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } != null else false
+                val current = controller.session(envelope.sessionId)
+                current != null && current.revision <= payload.ownerRevision &&
+                    controller.finishFromRemote(envelope.sessionId, cancelled = true)?.let { respond(envelope(it, SyncPayload.State(it)), sourceNodeId) } == true
             }
         }
+        if (handled) rememberEvent(envelope.eventId)
+        handled
     }
 
     suspend fun receiveCompleted(envelope: SyncEnvelope, sourceNodeId: String? = null): Boolean = mutex.withLock {
@@ -123,11 +122,14 @@ class MobileSyncCoordinator(
         return true
     }
 
-    private fun acceptEnvelope(envelope: SyncEnvelope): Boolean {
+    private fun isValidUnseenEnvelope(envelope: SyncEnvelope): Boolean {
         if (envelope.protocolVersion != PROTOCOL_VERSION || envelope.eventId.isBlank()) return false
-        if (!seenEventIds.add(envelope.eventId)) return false
+        return envelope.eventId !in seenEventIds
+    }
+
+    private fun rememberEvent(eventId: String) {
+        seenEventIds += eventId
         while (seenEventIds.size > MAX_SEEN_EVENTS) seenEventIds.remove(seenEventIds.first())
-        return true
     }
 
     private suspend fun isLowerRevision(envelope: SyncEnvelope): Boolean =

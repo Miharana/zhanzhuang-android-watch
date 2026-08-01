@@ -479,6 +479,28 @@ class WearSessionControllerTest {
     }
 
     @Test
+    fun terminalRecoveryRejectsDuplicateStartForTheSameSessionId() = runTest {
+        val store = RecordingStore()
+        val terminal = record(SessionStatus.COMPLETED)
+        val snapshots = RecordingSnapshots().also { it.save(WearSessionSnapshot(terminal, "boot")) }
+        val health = RecordingHealth()
+        val controller = WearSessionControllerImpl(
+            store, snapshots, health, AdjustableClock(), RecordingHaptics(), bootId = { "boot" },
+        )
+
+        val result = WearSessionCommandProcessor(controller).process(
+            WearSessionService.Command.Start(SessionConfig(15, 5), terminal.id),
+            bootId = "boot",
+            expectedSessionId = terminal.id,
+        )
+
+        assertEquals(ServiceCommandResult.REJECTED, result)
+        assertEquals(0, health.starts)
+        assertEquals(SessionStatus.COMPLETED, controller.state.value.record!!.status)
+        assertEquals(terminal.id, controller.state.value.record!!.id)
+    }
+
+    @Test
     fun completedTransactionSchedulesDurableOutboxDelivery() = runTest {
         var schedules = 0
         val controller = WearSessionControllerImpl(

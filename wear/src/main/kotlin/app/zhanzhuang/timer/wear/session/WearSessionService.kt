@@ -245,7 +245,12 @@ class WearSessionCommandProcessor(private val controller: WearSessionController)
                 else -> ServiceCommandResult.STOP
             }
             WearSessionRecovery.TERMINAL -> when (command) {
-                is WearSessionService.Command.Start -> { controller.start(command.config, command.sessionId); ServiceCommandResult.ACTIVE }
+                is WearSessionService.Command.Start -> if (controller.state.value.record?.id == command.sessionId) {
+                    ServiceCommandResult.REJECTED
+                } else {
+                    controller.start(command.config, command.sessionId)
+                    ServiceCommandResult.ACTIVE
+                }
                 else -> ServiceCommandResult.STOP
             }
             WearSessionRecovery.ACTIVE -> if (expectedSessionId != null && controller.state.value.record?.id != expectedSessionId) {

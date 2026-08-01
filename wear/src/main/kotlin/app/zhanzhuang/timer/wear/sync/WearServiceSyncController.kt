@@ -6,6 +6,7 @@ import android.os.Build
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.session.WearSessionService
 
@@ -15,6 +16,9 @@ class WearServiceSyncController(
     private val repository: WearSessionRepository,
 ) : WearSyncController {
     override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord? {
+        // A matching ID is a durable idempotency key. In particular, never let
+        // the service's TERMINAL + Start recovery path recreate it.
+        repository.get(sessionId)?.let { return it }
         val active = repository.activeSession()
         if (active != null && active.id != sessionId) return null
         return WearServiceCommandGateway.dispatch { requestId ->
@@ -39,7 +43,14 @@ class WearServiceSyncController(
     override suspend fun mergeRemote(record: SessionRecord): SessionRecord = repository.get(record.id) ?: record
 
     private suspend fun command(sessionId: String, action: String): SessionRecord? {
-        val current = repository.activeSession()?.takeIf { it.id == sessionId } ?: return null
+        val current = repository.get(sessionId) ?: return null
+        when (action) {
+            WearSessionService.ACTION_PAUSE -> if (current.status == SessionStatus.PAUSED) return current
+            WearSessionService.ACTION_RESUME -> if (current.status == SessionStatus.RUNNING) return current
+            WearSessionService.ACTION_FINISH,
+            WearSessionService.ACTION_CANCEL -> if (current.status in TERMINAL_STATUSES) return current
+        }
+        if (current.status !in ACTIVE_STATUSES) return null
         return WearServiceCommandGateway.dispatch { requestId ->
             startForeground(Intent(context, WearSessionService::class.java)
                 .setAction(action)
@@ -52,4 +63,8 @@ class WearServiceSyncController(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }
 
+    private companion object {
+        val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
+        val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
+    }
 }

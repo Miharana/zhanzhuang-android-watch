@@ -171,6 +171,20 @@ class MobileSyncCoordinatorTest {
         assertEquals(1, controller.remoteStarts)
     }
 
+    @Test
+    fun failedStateResponseDoesNotConsumeTheRemoteCommandEvent() = runTest {
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false, true)))
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+        val start = envelope("retry-start", 1, SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000L))
+
+        assertFalse(coordinator.receiveCommand(start))
+        assertTrue(coordinator.receiveCommand(start))
+
+        assertEquals(2, controller.remoteStarts)
+        assertEquals(2, transport.sentPayloadNames.count { it == "STATE" })
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -179,14 +193,21 @@ class MobileSyncCoordinatorTest {
         payload = payload,
     )
 
-    private class FakeTransport(private val ackResults: ArrayDeque<Boolean> = ArrayDeque()) : SyncTransport {
+    private class FakeTransport(
+        private val ackResults: ArrayDeque<Boolean> = ArrayDeque(),
+        private val messageResults: ArrayDeque<Boolean> = ArrayDeque(),
+    ) : SyncTransport {
         val sentPayloadNames = mutableListOf<String>()
         val envelopes = mutableListOf<SyncEnvelope>()
 
         override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
             sentPayloadNames += envelope.payload::class.simpleName!!.replace("QueryState", "QUERY_STATE").uppercase()
             envelopes += envelope
-            return if (envelope.payload is SyncPayload.Ack && ackResults.isNotEmpty()) ackResults.removeFirst() else true
+            return when {
+                envelope.payload is SyncPayload.Ack && ackResults.isNotEmpty() -> ackResults.removeFirst()
+                messageResults.isNotEmpty() -> messageResults.removeFirst()
+                else -> true
+            }
         }
 
         override suspend fun putCompleted(envelope: SyncEnvelope): Boolean = true

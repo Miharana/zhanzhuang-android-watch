@@ -8,6 +8,7 @@ import app.zhanzhuang.timer.model.SyncEnvelope
 import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -51,6 +52,26 @@ class WearSyncCoordinatorTest {
         assertEquals(1, outbox.pending.size)
     }
 
+    @Test
+    fun timedOutStartCanRetryWithTheSameEventAfterTheActorPersistsState() = runTest {
+        val persisted = record(2).copy(status = SessionStatus.RUNNING)
+        val controller = RetryableController()
+        val transport = FakeTransport()
+        val coordinator = WearSyncCoordinator(FakeOutbox(), transport, controller, nowEpochMillis = { 1_000 })
+        val start = envelope(
+            eventId = "retry-start",
+            revision = 1,
+            payload = SyncPayload.Start(SessionConfig(), expiresAtEpochMillis = 2_000),
+        )
+
+        assertFalse(coordinator.receiveCommand(start))
+        controller.persistAfterTimeout(persisted)
+        assertTrue(coordinator.receiveCommand(start))
+
+        assertEquals(2, controller.startCalls)
+        assertEquals(1, transport.messages.count { it.payload is SyncPayload.State })
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -71,7 +92,11 @@ class WearSyncCoordinatorTest {
 
     private class FakeTransport(private val completedResult: Boolean = true) : SyncTransport {
         var completedAttempts = 0
-        override suspend fun sendMessage(envelope: SyncEnvelope): Boolean = true
+        val messages = mutableListOf<SyncEnvelope>()
+        override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
+            messages += envelope
+            return true
+        }
         override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {
             completedAttempts++
             return completedResult
@@ -84,5 +109,21 @@ class WearSyncCoordinatorTest {
         override suspend fun acknowledge(eventId: String, revision: Long) {
             pending.removeAll { it.eventId == eventId && it.revision == revision }
         }
+    }
+
+    private class RetryableController : WearSyncController {
+        var startCalls = 0
+        private var durableRecord: SessionRecord? = null
+        override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord? {
+            startCalls += 1
+            return durableRecord
+        }
+        fun persistAfterTimeout(record: SessionRecord) { durableRecord = record }
+        override suspend fun current(): SessionRecord? = null
+        override suspend fun session(sessionId: String): SessionRecord? = null
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = null
+        override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record
     }
 }

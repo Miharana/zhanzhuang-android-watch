@@ -22,6 +22,7 @@ import org.robolectric.annotation.Config
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -62,6 +63,37 @@ class WearServiceSyncControllerTest {
         assertFalse(handled)
         assertTrue(context.startedIntents.isEmpty())
         assertTrue(transport.messages.isEmpty())
+    }
+
+    @Test
+    fun duplicateStartForAnExistingTerminalSessionDoesNotStartTheServiceAgain() = runTest {
+        val terminal = record("session-a", SessionStatus.COMPLETED, revision = 8)
+        repository.upsert(terminal)
+        val context = RecordingContext(ApplicationProvider.getApplicationContext())
+        val controller = WearServiceSyncController(context, repository)
+
+        val result = controller.startFromRemote(SessionConfig(), "session-a", revision = 1)
+
+        assertEquals(terminal, result)
+        assertTrue(context.startedIntents.isEmpty())
+        assertEquals(terminal, repository.get("session-a"))
+    }
+
+    @Test
+    fun alreadyAppliedPauseResumeAndFinishReturnDurableStateWithoutStartingService() = runTest {
+        val paused = record("paused", SessionStatus.PAUSED, revision = 3)
+        val running = record("running", SessionStatus.RUNNING, revision = 4)
+        val terminal = record("terminal", SessionStatus.COMPLETED, revision = 5)
+        repository.upsert(paused)
+        repository.upsert(running)
+        repository.upsert(terminal)
+        val context = RecordingContext(ApplicationProvider.getApplicationContext())
+        val controller = WearServiceSyncController(context, repository)
+
+        assertEquals(paused, controller.pauseFromRemote("paused"))
+        assertEquals(running, controller.resumeFromRemote("running"))
+        assertEquals(terminal, controller.finishFromRemote("terminal", cancelled = false))
+        assertTrue(context.startedIntents.isEmpty())
     }
 
     private fun record(id: String, status: SessionStatus, revision: Long) = SessionRecord(
