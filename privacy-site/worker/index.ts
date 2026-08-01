@@ -15,12 +15,25 @@ const securityPolicy = [
 
 const worker = {
   async fetch(request: Request, env: unknown, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    if (url.protocol === "http:") {
+      url.protocol = "https:";
+      return new Response(null, {
+        status: 308,
+        headers: { Location: url.toString() },
+      });
+    }
+
     const response = await handler.fetch(request, env, ctx);
     const headers = new Headers(response.headers);
     headers.set("Content-Security-Policy", securityPolicy);
     headers.set("Referrer-Policy", "no-referrer");
     headers.set("X-Content-Type-Options", "nosniff");
     headers.set("X-Frame-Options", "DENY");
+    headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
     headers.set(
       "Permissions-Policy",
       "camera=(), geolocation=(), microphone=(), payment=(), usb=()",

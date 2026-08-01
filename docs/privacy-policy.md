@@ -12,7 +12,7 @@ The app has no account system and does not send your data to a developer-operate
 
 ## Optional Health Connect writing
 
-Health Connect access is optional. When you explicitly grant write permissions, the phone app can write a completed exercise session and available heart-rate samples to Health Connect. The app does not read health data from Health Connect or from other apps. Refusing or later revoking this permission leaves the basic local timer available.
+Health Connect access is optional. When you explicitly grant write permissions, the phone app can write a completed mindfulness session to Health Connect. On devices where that record type is unavailable, it writes an exercise-session fallback. Available heart-rate samples can also be written. The app does not read health data from Health Connect or from other apps. Refusing or later revoking this permission leaves the basic local timer available.
 
 ## Retention and deletion
 

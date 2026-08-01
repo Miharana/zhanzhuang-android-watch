@@ -8,7 +8,7 @@ async function render() {
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request("https://localhost/", {
       headers: { accept: "text/html" },
     }),
     {
@@ -33,6 +33,10 @@ test("server-renders the bilingual privacy policy", async () => {
   );
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(
+    response.headers.get("strict-transport-security"),
+    "max-age=31536000; includeSubDomains",
+  );
 
   const html = await response.text();
   assert.match(html, /<title>Privacy — 站桩 · Zhan Zhuang<\/title>/i);
@@ -42,6 +46,23 @@ test("server-renders the bilingual privacy policy", async () => {
   assert.match(html, /Health Connect/);
   assert.match(html, /does not request location/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("redirects plain HTTP to HTTPS", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("redirect-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://zhanzhuang-privacy.artlinx.workers.dev/path?check=1"),
+    {},
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 308);
+  assert.equal(
+    response.headers.get("location"),
+    "https://zhanzhuang-privacy.artlinx.workers.dev/path?check=1",
+  );
 });
 
 test("uses the approved Urticad-inspired palette", async () => {

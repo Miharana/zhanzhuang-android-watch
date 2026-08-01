@@ -117,11 +117,13 @@ export default function Home() {
         >
           <p>
             Health Connect access is optional. When you explicitly grant write
-            permissions, the phone app can write a completed exercise session
-            and available heart-rate samples to Health Connect.
+            permissions, the phone app can write a completed mindfulness
+            session to Health Connect. On devices where that record type is not
+            supported, it writes an exercise-session fallback. Available
+            heart-rate samples can also be written.
           </p>
           <p lang="zh-CN">
-            Health Connect 权限完全可选。只有在你明确授予写入权限后，手机应用才会把已完成的运动会话和可用的心率样本写入 Health Connect。
+            Health Connect 权限完全可选。只有在你明确授予写入权限后，手机应用才会把已完成的正念会话写入 Health Connect；在不支持该记录类型的设备上，则回退写入运动会话。可用的心率样本也可以一并写入。
           </p>
           <p>
             The app does not read health data from Health Connect or from other

@@ -14,7 +14,7 @@ Release identity:
 - [ ] Enroll in Play App Signing and record the Play signing certificate separately from the local upload-certificate fingerprint.
 - [ ] Confirm the external upload key path and certificate, then run `scripts/verify_release.sh` with credentials only in the verification shell.
 - [ ] Complete developer identity/verification requirements in Play Console.
-- [ ] Complete the Health apps declaration: optional informational heart-rate collection on Wear and optional write-only Health Connect exercise/heart-rate output; no Health Connect reads.
+- [ ] Complete the Health apps declaration: optional informational heart-rate collection on Wear and optional write-only Health Connect mindfulness-session output (exercise-session fallback where mindfulness is unavailable) plus heart-rate output; no Health Connect reads.
 - [ ] Complete Data safety truthfully: no account, ads, analytics, cloud storage, or sale; local device/watch storage and optional Health Connect sharing only when the user grants it.
 - [ ] Complete the content rating questionnaire truthfully.
 - [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `dd372234-fa19-495c-adb1-54d279281a17`).
