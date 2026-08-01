@@ -78,6 +78,22 @@ class MobileSessionControllerTest {
     }
 
     @Test
+    fun shortCompletionNeverTransitionsToPendingOrCallsScheduler() = runTest {
+        val scheduler = RecordingHealthSyncScheduler()
+        val shortController = DefaultMobileSessionController(
+            repository = InMemorySessionRepository(), elapsedClock = elapsed, wallClock = wall,
+            haptics = haptics, healthSyncScheduler = scheduler,
+        )
+        shortController.start(SessionConfig(15, 5))
+        elapsed.advanceBy(30_000)
+
+        shortController.finish()
+
+        assertEquals(SyncState.LOCAL_ONLY, shortController.state.value.session!!.healthConnectState)
+        assertTrue(scheduler.statuses.isEmpty())
+    }
+
+    @Test
     fun healthSyncEnqueueFailureDoesNotBlockLocalCompletion() = runTest {
         val failingScheduler = HealthSyncScheduler { error("WorkManager unavailable") }
         val exportingController = DefaultMobileSessionController(

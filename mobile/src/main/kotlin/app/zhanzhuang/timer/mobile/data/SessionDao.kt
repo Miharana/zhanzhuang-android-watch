@@ -18,6 +18,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE status IN ('STARTING', 'RUNNING', 'PAUSED', 'COMPLETING') ORDER BY startedAtEpochMillis DESC LIMIT 1")
     suspend fun activeSession(): SessionEntity?
 
+    @Query("SELECT * FROM sessions WHERE status = 'COMPLETED' AND healthConnectState = 'PENDING'")
+    suspend fun pendingHealthSyncSessions(): List<SessionEntity>
+
     @Query("SELECT * FROM heart_rate_samples WHERE sessionId = :sessionId ORDER BY epochMillis")
     suspend fun samplesFor(sessionId: String): List<HeartRateEntity>
 

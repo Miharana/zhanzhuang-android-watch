@@ -100,6 +100,17 @@ class HealthSyncWorker(
             )
             return true
         }
+
+        suspend fun reconcile(context: Context) {
+            val repository = HealthSyncWorkerDependencies.sessionRepository?.invoke(context) ?: return
+            reconciliationCandidates(repository.pendingHealthSyncSessions()).forEach { enqueue(context, it) }
+        }
+
+        fun reconciliationCandidates(records: List<SessionRecord>): List<SessionRecord> = records.filter {
+            it.status == SessionStatus.COMPLETED &&
+                it.healthConnectState == SyncState.PENDING &&
+                it.activeDurationMs >= MIN_EXPORT_DURATION_MILLIS
+        }
     }
 }
 

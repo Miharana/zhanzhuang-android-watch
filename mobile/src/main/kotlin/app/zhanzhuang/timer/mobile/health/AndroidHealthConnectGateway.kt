@@ -17,6 +17,7 @@ import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
 import java.io.IOException
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 
 enum class HealthSessionRecordKind { MINDFULNESS, EXERCISE }
 
@@ -38,7 +39,8 @@ class AndroidHealthConnectGateway(
                 HealthAvailability.MINDFULNESS_UNSUPPORTED
             }
         }
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        if (error is CancellationException) throw error
         HealthAvailability.UNAVAILABLE
     }
 
@@ -48,6 +50,7 @@ class AndroidHealthConnectGateway(
     override suspend fun write(record: SessionRecord): HealthWriteResult = try {
         writeInternal(record)
     } catch (error: Exception) {
+        if (error is CancellationException) throw error
         error.toWriteFailure()
     }
 
@@ -181,8 +184,13 @@ class AndroidHealthConnectGateway(
             HealthAvailability.UNAVAILABLE -> error("Unavailable Health Connect cannot create a record")
         }
 
-        fun sessionMetadata(record: SessionRecord): Metadata =
-            recordedMetadata(sessionClientRecordId(record), record)
+        fun sessionMetadata(record: SessionRecord, device: Device = phoneDevice()): Metadata =
+            recordedMetadata(sessionClientRecordId(record), record, device)
+
+        fun rethrowCancellation(error: Exception): Boolean {
+            if (error is CancellationException) throw error
+            return false
+        }
 
         fun writeFailure(error: Exception): HealthWriteResult = when (error) {
             is IOException,
@@ -202,15 +210,13 @@ class AndroidHealthConnectGateway(
             }
         }
 
-        private fun recordedMetadata(clientRecordId: String, record: SessionRecord): Metadata =
+        private fun recordedMetadata(clientRecordId: String, record: SessionRecord, device: Device = phoneDevice()): Metadata =
             Metadata.activelyRecorded(
-                Device(
-                    type = Device.TYPE_PHONE,
-                    manufacturer = "",
-                    model = "",
-                ),
+                device,
                 clientRecordId,
                 clientRecordVersion(record),
             )
+
+        private fun phoneDevice() = Device(Device.TYPE_PHONE, android.os.Build.MANUFACTURER, android.os.Build.MODEL)
     }
 }

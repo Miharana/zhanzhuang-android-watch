@@ -7,11 +7,13 @@ import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.model.SyncState
 import android.os.RemoteException
+import kotlinx.coroutines.CancellationException
 import androidx.health.connect.client.records.metadata.Metadata
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class HealthSyncWorkerTest {
@@ -118,11 +120,23 @@ class HealthSyncWorkerTest {
 
     @Test
     fun userStartedSessionsUseActivelyRecordedMetadata() {
-        val metadata = AndroidHealthConnectGateway.sessionMetadata(completed())
+        val metadata = AndroidHealthConnectGateway.sessionMetadata(
+            completed(),
+            androidx.health.connect.client.records.metadata.Device(
+                androidx.health.connect.client.records.metadata.Device.TYPE_PHONE, "test", "test",
+            ),
+        )
 
         assertEquals(Metadata.RECORDING_METHOD_ACTIVELY_RECORDED, metadata.recordingMethod)
         assertEquals("zz:session-1:session", metadata.clientRecordId)
         assertEquals(7, metadata.clientRecordVersion)
+    }
+
+    @Test
+    fun cancellationIsNotTranslatedToAHealthFailure() {
+        assertFailsWith<CancellationException> {
+            AndroidHealthConnectGateway.rethrowCancellation(CancellationException("cancelled"))
+        }
     }
 
     @Test
@@ -136,6 +150,14 @@ class HealthSyncWorkerTest {
 
         assertEquals(9, updated?.revision)
         assertEquals(SyncState.SYNCED, updated?.healthConnectState)
+    }
+
+    @Test
+    fun reconciliationReenqueuesOnlyEligiblePendingCompletions() {
+        val pending = completed().copy(healthConnectState = SyncState.PENDING)
+        val shortPending = completed(activeDurationMillis = 30_000).copy(healthConnectState = SyncState.PENDING)
+
+        assertEquals(listOf(pending), HealthSyncWorker.reconciliationCandidates(listOf(pending, shortPending)))
     }
 
     @Test

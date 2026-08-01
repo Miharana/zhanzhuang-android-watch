@@ -10,6 +10,7 @@ interface SessionRepository {
     suspend fun activeSession(): SessionRecord?
     suspend fun runtimeSnapshot(): MobileRuntimeSnapshot?
     suspend fun upsert(record: SessionRecord, runtimeSnapshot: MobileRuntimeSnapshot? = null)
+    suspend fun pendingHealthSyncSessions(): List<SessionRecord> = emptyList()
 }
 
 class MobileSessionRepository(database: MobileDatabase) : SessionRepository {
@@ -24,6 +25,10 @@ class MobileSessionRepository(database: MobileDatabase) : SessionRepository {
     }
 
     override suspend fun activeSession(): SessionRecord? = dao.activeSession()?.let { session ->
+        session.toRecord(dao.samplesFor(session.id))
+    }
+
+    override suspend fun pendingHealthSyncSessions(): List<SessionRecord> = dao.pendingHealthSyncSessions().map { session ->
         session.toRecord(dao.samplesFor(session.id))
     }
 

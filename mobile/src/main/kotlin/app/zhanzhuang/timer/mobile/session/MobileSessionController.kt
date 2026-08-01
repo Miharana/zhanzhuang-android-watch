@@ -204,7 +204,7 @@ class DefaultMobileSessionController(
         lastPersistedActiveMs = currentSnapshot.activeElapsedMs
         repository.upsert(finished)
         mutableState.value = uiState(finished, currentSnapshot)
-        if (!cancelled) {
+        if (!cancelled && finished.activeDurationMs >= 60_000L) {
             val pendingExport = finished.copy(
                 revision = finished.revision + 1,
                 healthConnectState = app.zhanzhuang.timer.model.SyncState.PENDING,

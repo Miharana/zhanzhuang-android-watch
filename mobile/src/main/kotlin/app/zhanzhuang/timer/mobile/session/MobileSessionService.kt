@@ -47,6 +47,7 @@ open class MobileSessionService : Service() {
         val dependencies = testDependencies ?: defaultDependencies()
         serviceScope = CoroutineScope(SupervisorJob() + dependencies.dispatcher)
         val controller = dependencies.controllerFactory(applicationContext)
+        serviceScope.launch { HealthSyncWorker.reconcile(applicationContext) }
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, notification())
         runtime = MobileSessionServiceRuntime(
