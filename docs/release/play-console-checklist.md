@@ -10,11 +10,10 @@ Release identity:
 
 ## Before any upload
 
-- [ ] Register the Play developer account as an **organisation**, not a personal
-  account. Google says organisation accounts should be used for health apps;
-  organisation verification requires a D-U-N-S number and matching legal and
-  payments-profile information. Official guidance:
-  <https://support.google.com/googleplay/android-developer/answer/13634885?hl=en-GB>.
+- [x] Use the existing **Urticad Tech Ltd** organisation developer account that
+  already ships Miharana (`com.urticad.miharana`). Do not create a duplicate
+  Play account. The owner identity is `wangyal@urticad.com`; the currently
+  open browser handoff is waiting for its passkey/security verification.
 - [ ] Confirm the package is available or the correct Play app record is registered under the verified developer account.
 - [ ] Enroll in Play App Signing and record the Play signing certificate separately from the local upload-certificate fingerprint.
 - [ ] Confirm the external upload key path and certificate, then run `scripts/verify_release.sh` with credentials only in the verification shell.
@@ -23,7 +22,8 @@ Release identity:
 - [ ] Complete Data safety truthfully: no account, ads, analytics, cloud storage, or sale; local device/watch storage and optional Health Connect sharing only when the user grants it.
 - [ ] Complete the content rating questionnaire truthfully.
 - [x] Publish the bilingual privacy policy at a public HTTPS URL. Remote HTTP and rendered-content readback passed for <https://zhanzhuang-privacy.artlinx.workers.dev> on 2026-08-01 (Cloudflare Worker version `5c67d0f4-9644-4e8e-8b05-8620351dc62f`, source commit `aee4218`).
-- [ ] Add the published privacy URL in Play Console and set a verified public developer contact route; this repository intentionally does not invent an email address.
+- [ ] Add the published privacy URL in Play Console and verify the established
+  Urticad public developer contact route, `wangyal@urticad.com`.
 - [ ] Upload both bilingual listing locales, icon, feature graphic, phone screenshots, Wear screenshots, and changelogs.
 - [ ] Add internal testers and verify their access before uploading a binary.
 - [ ] Opt the app into Wear OS distribution and confirm the exact dedicated Wear form-factor track identifier in Play Console/API. Do not infer or guess that track.
@@ -56,10 +56,11 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
   not distinguish those states. This verification necessarily created two
   transient Publisher edits; neither had an `edit.commit` call or any uploaded
   binary, metadata, or asset.
-- [ ] Play Console bootstrap is blocked at the **Creating a developer account**
-  page in the only available Chrome session; no alternate in-app-browser
-  session was available. No account, app record, declaration, tester, listing,
-  asset, or binary was submitted in this task.
+- [ ] Play Console owner authentication is pending. The earlier **Creating a
+  developer account** page belonged to the wrong signed-in Google identity and
+  did not mean the Urticad developer account was absent. Chrome is now waiting
+  for the `wangyal@urticad.com` passkey/security check. No account, app record,
+  declaration, tester, listing, asset, or binary was submitted in this task.
 - [ ] The exact Wear OS dedicated internal track is not known. It must be read
   from the authorized Console/API before a Wear AAB upload.
 - [ ] The signed candidate hashes and this attempt are recorded in
@@ -70,11 +71,10 @@ Google Play may require a manual Play Console app/bootstrap before the first bin
   repository-external service-account paths without opening an edit. All user
   tokens return 403 for the target and control packages. The two service-account
   files are byte-identical; that single credential reads its known control
-  package (HTTP 200) but the target returns HTTP 404. The live Console remains
-  at the account-type step of developer account signup, with no form submission
-  or billing/account mutation.
-- [x] The account-type decision is resolved: use an organisation account because
-  this app tracks/exports wellness and heart-rate information and therefore
-  falls within Google Play's Health apps scope. The owner still has to supply
-  and verify the organisation's D-U-N-S, legal, contact, identity, and payments
-  information.
+  package (HTTP 200) but the target returns HTTP 404. That apparent signup route
+  was traced to the wrong browser identity; the live Console handoff now targets
+  the existing Urticad owner and waits only for its passkey/security check.
+- [x] The account route is resolved: reuse the existing Urticad Tech Ltd
+  organisation account and its proven Miharana/Fastlane release infrastructure.
+  Only owner authentication, target-app creation, and explicit target-app
+  service-account authorization remain before the automated upload can start.

@@ -67,16 +67,21 @@ Wear internal track identifier. Uploading a mobile binary, guessing a Wear
 track, or asserting Play App Signing/Health/Data Safety/tester state would
 therefore be unsafe and was not done.
 
-## External blocker and exact continuation
+## Existing organisation account and exact continuation
 
-An account owner must complete the Google Play developer-account bootstrap as
-an **organisation account** (including D-U-N-S, matching legal/contact details,
-identity, terms, and payment steps), then grant a repository-external service
-account app access or provide an appropriately authorized external credential.
-Google's current account-type guidance says organisation accounts should be
-used for health apps and that D-U-N-S verification is mandatory:
-<https://support.google.com/googleplay/android-developer/answer/13634885?hl=en-GB>.
-Once an authenticated developer dashboard is available, the continuation is:
+The existing **Urticad Tech Ltd** Google Play organisation account is the
+correct release owner. This was verified from the established Miharana Android
+release trail (`com.urticad.miharana`) and its working app-scoped Fastlane
+service account. The earlier signup page was not evidence that a developer
+account was missing: Chrome was signed in as `scorpiocn@gmail.com`, while the
+existing Play owner route uses `wangyal@urticad.com`. No second developer
+account or duplicate registration should be created.
+
+The Miharana service account is app-scoped and cannot create or access
+`app.zhanzhuang.timer`. The immediate continuation is therefore one owner
+authentication in Play Console, followed by target-app creation and an explicit
+grant to the repository-external service account. Once the existing Urticad
+dashboard is authenticated:
 
 1. Create or confirm the `app.zhanzhuang.timer` record; enroll Play App
    Signing; complete truthful Health apps, Data safety, content rating, public
@@ -108,9 +113,9 @@ Once an authenticated developer dashboard is available, the continuation is:
 - `.openai/hosting.json` records the non-secret Cloudflare account/project
   identifier, Worker name, production URL, deployed version, successful state,
   and source commit so later updates target the same public site.
-- The URL is ready to enter in Play Console. Console entry and the required
-  verified public developer contact route remain blocked by the developer
-  account bootstrap described above.
+- The URL is ready to enter in Play Console. Console entry remains pending the
+  owner authentication described above; the established Urticad public contact
+  route is `wangyal@urticad.com` and must be verified in Play Console.
 
 ## Current remote truth
 
@@ -141,19 +146,19 @@ credential without opening a Publisher edit:
   same read-only `reviews.list` request. This reconfirms that the credential is
   functional while the target package remains absent from or unavailable to
   that Play account.
-- A fresh, read-only Chrome snapshot still shows **Creating a Play Console
-  developer account** at `https://play.google.com/console/signup`. The page is
-  waiting for an organisation-versus-personal account decision before identity,
-  terms, and payment setup. No choice was clicked, no form was filled, and no
-  account or billing mutation was made. The live tab was left open as a handoff
-  for the account owner.
-- The optimal account-type choice is now resolved from current official Play
-  guidance: use an organisation account because this timer handles wellness and
-  heart-rate information and is a Health app. This decision does not eliminate
-  the owner-only D-U-N-S, legal identity, terms, and payment verification steps.
+- A fresh Chrome audit showed that the signup route belonged to the currently
+  signed-in `scorpiocn@gmail.com` identity, not to the established Urticad Play
+  owner. The browser has now been switched to the known owner identity
+  `wangyal@urticad.com` and is waiting for the account holder's passkey/security
+  verification. No password, passkey, form, billing, or account mutation was
+  handled by the release automation.
+- The account-type decision remains organisation, but no new account bootstrap
+  is required. Urticad Tech Ltd already owns the Play account used to ship
+  Miharana; the remaining gate is owner authentication and target-app/service-
+  account authorization inside that existing account.
 
 Unlike the earlier track checks, these continuation probes created no Android
 Publisher edit and performed no remote write. Until the owner completes the
-developer-account registration and grants target-app access, there is no safe
-API or Console path to create/read the target app, discover the dedicated Wear
-track, upload either AAB, or perform Play-delivered Pixel Watch 4 QA.
+visible security check and grants target-app access, there is no safe API or
+Console path to create/read the target app, discover the dedicated Wear track,
+upload either AAB, or perform Play-delivered Pixel Watch 4 QA.
