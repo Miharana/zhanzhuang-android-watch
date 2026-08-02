@@ -1,6 +1,6 @@
 # Zhan Zhuang 0.1.1 Stability Design
 
-Status: approved direction, pending written-spec review
+Status: approved
 
 Date: 2026-08-02
 
