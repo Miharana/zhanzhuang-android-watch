@@ -8,9 +8,17 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.wear.ongoing.OngoingActivity
 import app.zhanzhuang.timer.wear.R
+import app.zhanzhuang.timer.wear.MainActivity
 
 /** Builds one truthful, non-dismissable notification and registers it as a Wear ongoing activity. */
 class OngoingSessionNotification(private val context: Context) {
+    fun openActivityIntent(): PendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
     fun build(state: WearSessionUiState?, touchIntent: PendingIntent): android.app.Notification {
         ensureChannel()
         val text = when (state?.record?.status) {
@@ -32,7 +40,6 @@ class OngoingSessionNotification(private val context: Context) {
             .setOngoing(state?.record?.status in ACTIVE_NOTIFICATION_STATUSES)
             .setOnlyAlertOnce(true)
             .setContentIntent(touchIntent)
-        // Task 7 will replace this temporary STATUS tap target with a session screen.
         // Never attach an ongoing-activity extension for an empty or terminal state.
         if (state?.record?.status in ACTIVE_NOTIFICATION_STATUSES) {
             OngoingActivity.Builder(context, NOTIFICATION_ID, builder).build().apply(context)

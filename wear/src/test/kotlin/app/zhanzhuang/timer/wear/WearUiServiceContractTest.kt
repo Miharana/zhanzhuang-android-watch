@@ -12,10 +12,21 @@ import kotlin.test.assertIs
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WearUiServiceContractTest {
+    @Test fun manifestDeclaresPermissionSafeForegroundTypes() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+
+        assertTrue(manifest.contains("android.permission.FOREGROUND_SERVICE_SPECIAL_USE"))
+        assertTrue(manifest.contains("android:foregroundServiceType=\"health|specialUse\""))
+        assertTrue(manifest.contains("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"))
+        assertTrue(manifest.contains("android:value=\"standing_meditation_timer\""))
+    }
+
     @Test fun explicitSetupStartUsesTheServiceStartContract() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val intent = WearSessionService.startIntent(context, SessionConfig(45, 15), "ui-session")
