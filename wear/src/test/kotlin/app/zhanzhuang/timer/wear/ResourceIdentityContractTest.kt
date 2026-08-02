@@ -42,6 +42,17 @@ class ResourceIdentityContractTest {
         assertTrue(foreground.contains("#E7D5A6") && foreground.contains("#C6A867") && foreground.contains("#A9863F") && foreground.contains("#D8C18C"))
         assertTrue(resource("drawable/ic_launcher_background.xml").readText().contains("#15110B"))
         assertTrue(foreground.contains("#FFF4D6"))
+        assertTrue(foreground.contains("android:strokeLineCap=\"round\""))
+        assertTrue(foreground.contains("android:strokeLineJoin=\"round\""))
+        assertTrue(foreground.contains("android:fillColor=\"#00000000\""))
+        assertFalse(foreground.contains("M50,27L58,27L60,43"))
+
+        val svg = File("../fastlane/assets-source/icon.svg").readText()
+        assertTrue(svg.contains("id=\"holding-ball-figure\""))
+        assertTrue(svg.contains("stroke-linecap=\"round\""))
+        assertTrue(svg.contains("stroke-linejoin=\"round\""))
+        assertFalse(svg.contains("<text"))
+        assertFalse(svg.contains("<linearGradient"))
     }
 
     private fun keys(locale: String) = copy(locale).keys
