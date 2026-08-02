@@ -89,6 +89,14 @@ class WearSyncCoordinator(
         outbox.pendingCompleted().all { entry -> transport.putCompleted(entry.envelope) }
     }
 
+    /** Re-establishes the authoritative Wear-owned timer after a paired phone reconnects. */
+    suspend fun publishCurrentState(nodeId: String): Boolean = mutex.withLock {
+        val record = controller?.current()?.takeIf {
+            it.owner == SessionOwner.WEAR && it.status in ACTIVE_STATUSES
+        } ?: return@withLock false
+        sendState(record, nodeId)
+    }
+
     /** Best-effort immediate terminal state; completed DataItem outbox remains the durable fallback. */
     suspend fun publishState(record: SessionRecord): Boolean = mutex.withLock { sendState(record, sourceNodeId = null) }
 
@@ -155,6 +163,7 @@ class WearSyncCoordinator(
     private companion object {
         const val MAX_SEEN_EVENTS = 512
         val START_REPLAY_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING, SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
+        val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
         val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }
 }

@@ -10,6 +10,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 const val PROTOCOL_VERSION = 1
+const val CAPABILITY_ZHAN_ZHUANG_SYNC = "zhan_zhang_sync"
 const val PATH_COMMAND = "/zhan-zhuang/v1/command"
 const val PATH_STATE = "/zhan-zhuang/v1/state"
 const val PATH_COMPLETED = "/zhan-zhuang/v1/completed"

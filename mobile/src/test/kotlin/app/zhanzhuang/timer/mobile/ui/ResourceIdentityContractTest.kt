@@ -6,8 +6,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_SYNC
 
 class ResourceIdentityContractTest {
+    @Test fun wearableCapabilityMatchesTheSharedWireIdentity() {
+        val xml = File("src/main/res/xml/wearable_capabilities.xml").readText()
+        assertEquals(listOf(CAPABILITY_ZHAN_ZHUANG_SYNC), Regex("<capability name=\"([^\"]+)\"").findAll(xml).map { it.groupValues[1] }.toList())
+    }
+
     @Test fun localeKeysMatch() = assertEquals(keys("values"), keys("values-zh-rCN"))
 
     @Test fun requiredIdentityCopyIsPresent() {

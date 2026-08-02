@@ -12,9 +12,29 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertIs
 import kotlinx.coroutines.test.runTest
 
 class WearSyncCoordinatorTest {
+    @Test fun activeCurrentStateIsPublishedToReconnectedPeer() = runTest {
+        val active = record(4).copy(status = SessionStatus.RUNNING, endEpochMillis = null)
+        val controller = CurrentController(active)
+        val transport = FakeTransport()
+
+        assertTrue(WearSyncCoordinator(FakeOutbox(), transport, controller).publishCurrentState("phone-node"))
+
+        assertEquals(listOf("phone-node"), transport.targetNodeIds)
+        assertEquals(active.copy(heartRateSamples = emptyList()), assertIs<SyncPayload.State>(transport.messages.single().payload).record)
+    }
+
+    @Test fun terminalCurrentStateIsNotPublishedOnReconnect() = runTest {
+        val transport = FakeTransport()
+
+        assertFalse(WearSyncCoordinator(FakeOutbox(), transport, CurrentController(record(4))).publishCurrentState("phone-node"))
+
+        assertTrue(transport.messages.isEmpty())
+    }
+
     @Test
     fun matchingAckClearsOnlyMatchingOutboxEventAndRevision() = runTest {
         val outbox = FakeOutbox()
@@ -167,14 +187,29 @@ class WearSyncCoordinatorTest {
     ) : SyncTransport {
         var completedAttempts = 0
         val messages = mutableListOf<SyncEnvelope>()
+        val targetNodeIds = mutableListOf<String>()
         override suspend fun sendMessage(envelope: SyncEnvelope): Boolean {
             messages += envelope
             return messageResults.removeFirstOrNull() ?: true
+        }
+        override suspend fun sendMessageTo(envelope: SyncEnvelope, nodeId: String): Boolean {
+            targetNodeIds += nodeId
+            return sendMessage(envelope)
         }
         override suspend fun putCompleted(envelope: SyncEnvelope): Boolean {
             completedAttempts++
             return completedResult
         }
+    }
+
+    private class CurrentController(private val record: SessionRecord?) : WearSyncController {
+        override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord? = null
+        override suspend fun current(): SessionRecord? = record
+        override suspend fun session(sessionId: String): SessionRecord? = record?.takeIf { it.id == sessionId }
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = null
+        override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record
     }
 
     private class FakeOutbox : WearCompletionOutbox {

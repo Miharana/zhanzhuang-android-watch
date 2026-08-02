@@ -6,6 +6,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SyncProtocolTest {
+    @Test fun capabilityNameRemainsBackwardCompatible() {
+        assertEquals("zhan_zhang_sync", CAPABILITY_ZHAN_ZHUANG_SYNC)
+    }
+
     @Test
     fun completedRecordRoundTripsThroughGzipOutboxPayload() {
         val envelope = SyncEnvelope(

@@ -51,6 +51,7 @@ import app.zhanzhuang.timer.mobile.ui.screens.SettingsScreen
 import app.zhanzhuang.timer.mobile.ui.screens.TrainingScreen
 import app.zhanzhuang.timer.mobile.ui.theme.ZhanZhuangTheme
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_SYNC
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import com.google.android.gms.wearable.CapabilityClient
@@ -210,13 +211,13 @@ private class AndroidWatchConnectionPort(
             if (reconnected) launch { runCatching { coordinator.queryCurrentWearState() } }
         }
         val listener = CapabilityClient.OnCapabilityChangedListener(::publish)
-        client.addListener(listener, CAPABILITY)
+        client.addListener(listener, CAPABILITY_ZHAN_ZHUANG_SYNC)
         launch {
-            runCatching { client.getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await() }
+            runCatching { client.getCapability(CAPABILITY_ZHAN_ZHUANG_SYNC, CapabilityClient.FILTER_REACHABLE).await() }
                 .getOrNull()
                 .let(::publish)
         }
-        awaitClose { client.removeListener(listener, CAPABILITY) }
+        awaitClose { client.removeListener(listener, CAPABILITY_ZHAN_ZHUANG_SYNC) }
     }.distinctUntilChanged()
 
     private fun CapabilityInfo.toConnection(): WatchConnectionState = WatchConnectionState(
@@ -224,5 +225,4 @@ private class AndroidWatchConnectionPort(
         name = nodes.firstOrNull()?.displayName,
     )
 
-    private companion object { const val CAPABILITY = "zhan_zhang_sync" }
 }
