@@ -12,3 +12,4 @@ service-account*.json
 *.properties.local
 .idea/
 *.iml
+.worktrees/
