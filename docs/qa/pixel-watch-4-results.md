@@ -1,6 +1,6 @@
 # Pixel Watch 4 physical QA results
 
-Date: 2026-08-01
+Date: 2026-08-02
 
 Physical Pixel Watch 4 evidence is **blocked**: no physical watch was attached during this task. Nothing below is a pass inferred from emulator or local build output.
 
@@ -22,11 +22,14 @@ A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear in
 
 ## Play-delivered build status
 
-Play-delivered testing is **blocked**. On 2026-08-01 the available Play Console
-session reached developer-account signup rather than a verified developer
-dashboard, so neither the mobile nor Wear AAB was uploaded to internal testing.
-There is no Play installer, Play App Signing, paired-device, Health Connect, or
-Data Layer result to report. This does not alter any physical-device row above.
+Play delivery is **ready for physical testing**. The phone and Wear OS internal
+tracks are active with version `0.1.0`; the shared tester list is enabled on
+both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
+install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
+Pro. The remote-install confirmation is waiting for the account holder's Google
+Passkey verification. No runtime, Health Connect, Data Layer, timing, haptic, or
+recovery result is inferred from track activation or device recognition, so the
+physical-device rows above remain `Blocked` until observed.
 
 ## Operator evidence template
 

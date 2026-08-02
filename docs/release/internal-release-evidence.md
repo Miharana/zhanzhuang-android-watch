@@ -1,6 +1,6 @@
 # Google Play release evidence
 
-Last updated: 2026-08-01 (UTC)
+Last updated: 2026-08-02 (UTC)
 
 ## Release identity
 
@@ -46,10 +46,21 @@ overview confirmed **15 changes sent for review** and now groups them under
 the automated quick-check progress or any issue, while the submission remained
 under **Changes in review**.
 
-Internal tester: `wangyal@urticad.com`
+Internal tester list: `Internal Testers` (2 users)
 
-Internal opt-in URL:
+- `wangyal@urticad.com`
+- `scorpiocn@gmail.com`
+
+Phone/tablet internal opt-in URL:
 <https://play.google.com/apps/internaltest/4701473602939953272>
+
+Wear OS internal opt-in URL:
+<https://play.google.com/apps/internaltest/4698135762362798560>
+
+The tester list is selected on both internal tracks. Google Play accepted the
+invite for `scorpiocn@gmail.com`, and its install picker recognizes the paired
+Google Pixel Watch 4 and Google Pixel 10 Pro. Remote installation still requires
+the account holder's Google Passkey confirmation.
 
 ## Store and policy setup
 
