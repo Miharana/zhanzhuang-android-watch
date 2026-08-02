@@ -28,7 +28,7 @@ class MobileSessionFlowTest {
         rule.activity.deleteDatabase("zhan_zhuang.db")
     }
 
-    @Test fun disconnected_phone_start_finishes_and_is_visible_in_history() {
+    @Test fun disconnected_phone_can_start_again_after_a_durable_completion() {
         rule.onNodeWithText("Start standing").performClick()
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Standing").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Standing").assertIsDisplayed()
@@ -40,14 +40,35 @@ class MobileSessionFlowTest {
 
         rule.runOnUiThread { rule.activity.recreate() }
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Completed").fetchSemanticsNodes().isNotEmpty() }
-        assertCompletedRecordIsDurable()
+        val completedId = completedRecordId()
+
+        rule.onNodeWithText("Start standing").performClick()
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Standing").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Standing").assertIsDisplayed()
+        assertNewActiveRecordPreservesCompletion(completedId)
     }
 
-    private fun assertCompletedRecordIsDurable() = runBlocking {
+    private fun completedRecordId(): String = runBlocking {
         val database = Room.databaseBuilder(rule.activity, MobileDatabase::class.java, "zhan_zhuang.db").build()
         try {
             val records = withTimeout(10_000) { database.sessionDao().observeAll().first { it.isNotEmpty() } }
             check(records.single().status == "COMPLETED") { "expected durable COMPLETED record, got ${records.map { it.status }}" }
+            records.single().id
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun assertNewActiveRecordPreservesCompletion(completedId: String) = runBlocking {
+        val database = Room.databaseBuilder(rule.activity, MobileDatabase::class.java, "zhan_zhuang.db").build()
+        try {
+            val records = withTimeout(10_000) { database.sessionDao().observeAll().first { it.size == 2 } }
+            check(records.any { it.id == completedId && it.status == "COMPLETED" }) {
+                "completed record $completedId was not preserved: ${records.map { it.id to it.status }}"
+            }
+            check(records.any { it.id != completedId && it.status in setOf("STARTING", "RUNNING") }) {
+                "expected a different active record: ${records.map { it.id to it.status }}"
+            }
         } finally {
             database.close()
         }

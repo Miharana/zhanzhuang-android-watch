@@ -69,9 +69,15 @@ fun TrainingScreen(
             }
         }
         HorizontalDivider()
-        if (active) ActiveTraining(state, onPause, onResume, onFinish, onCancel)
-        else if (state.session?.status in TERMINAL_STATUSES) TerminalTraining(state)
-        else SetupTraining(state, onDurationChange, onIntervalChange, onStart)
+        when {
+            active -> ActiveTraining(state, onPause, onResume, onFinish, onCancel)
+            state.session?.status in TERMINAL_STATUSES -> {
+                TerminalTraining(state)
+                HorizontalDivider()
+                SetupTraining(state, onDurationChange, onIntervalChange, onStart)
+            }
+            else -> SetupTraining(state, onDurationChange, onIntervalChange, onStart)
+        }
     }
 }
 

@@ -9,6 +9,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.SessionOwner
+import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.mobile.ui.screens.SessionDetailScreen
 import app.zhanzhuang.timer.mobile.ui.screens.TrainingScreen
 import org.junit.Rule
@@ -18,6 +21,34 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MobileScreensTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test
+    fun completedSummaryKeepsNewSessionControlsReachable() {
+        rule.setContent {
+            TrainingScreen(
+                state = TrainingUiState(
+                    session = SessionRecord(
+                        id = "completed-session",
+                        config = SessionConfig(),
+                        status = SessionStatus.COMPLETED,
+                        owner = SessionOwner.MOBILE,
+                        activeDurationMs = 30 * 60_000L,
+                    ),
+                    activeElapsedMs = 30 * 60_000L,
+                ),
+                onDurationChange = {},
+                onIntervalChange = {},
+                onStart = {},
+                onPause = {},
+                onResume = {},
+                onFinish = {},
+                onCancel = {},
+            )
+        }
+
+        rule.onNodeWithText("Completed").assertIsDisplayed()
+        rule.onNodeWithText("Start standing").assertIsDisplayed()
+    }
 
     @Test
     fun disconnectedWatchExplainsMissingHeartRate() {
