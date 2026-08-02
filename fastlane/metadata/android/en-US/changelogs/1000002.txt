@@ -1,0 +1,1 @@
+Start another standing session immediately after finishing while keeping your history. Improved phone-to-watch reconnection, safer Wear launch without heart-rate permission, and a new gold holding-ball icon.
