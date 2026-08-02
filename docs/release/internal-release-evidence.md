@@ -22,6 +22,27 @@ release bundle builds, JAR signature verification, upload-certificate matching,
 bundle manifest inspection, package/version checks, target SDK 36 checks, and
 the no-Internet/no-location release contract.
 
+## 0.1.1 internal candidate (not uploaded)
+
+Source commit: `e0f6200f2a3a236adc7bb378e49d616a7f366067`
+
+| Surface | Version code | Candidate | SHA-256 |
+| --- | ---: | --- | --- |
+| Phones/tablets | `1000002` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `7ef4f2e0cdfaa7fbd66075180a787147e40d0bf585adcabc21dc2777d287c8c3` |
+| Wear OS | `2000002` | `wear/build/outputs/bundle/release/wear-release.aab` | `7d32afffd7f23c1645f3fb87c614fdc9a6137da777f73e9591164e066a00962c` |
+
+Both candidates were rebuilt from the committed `0.1.1` identity without a
+Gradle clean task. Bundletool readback confirms package
+`app.zhanzhuang.timer`, version name `0.1.1`, target SDK 36, and version codes
+`1000002` / `2000002`. `jarsigner` reports both jars verified, and both upload
+certificates match the established SHA-256 above. The four-module JVM suite,
+both debug APKs, mobile instrumentation APK compilation, both release bundles,
+and release lint-vital tasks passed.
+
+These files have not been uploaded to Google Play. The connected mobile flow
+and Pixel Watch 4 matrix remain required because no ADB device was attached
+during this build. The active `0.1.0` production review remains untouched.
+
 ## Google Play remote state
 
 The established Miharana Fastlane service account was granted only the app-

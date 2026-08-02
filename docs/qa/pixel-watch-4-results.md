@@ -2,10 +2,18 @@
 
 Date: 2026-08-02
 
-Physical Pixel Watch 4 evidence is **blocked**: no physical watch was attached during this task. Nothing below is a pass inferred from emulator or local build output.
+Physical Pixel Watch 4 evidence for `0.1.1` is **not run**: `adb devices -l`
+returned no attached devices during this build. Nothing below is a pass
+inferred from emulator, unit tests, or local build output.
 
 | Scenario | Expected observation | Observed result | Status |
 | --- | --- | --- | --- |
+| Cold launch before heart-rate permission | App opens setup without a foreground-service crash | Not run | Not run |
+| Continue without heart rate | Duration-only timer starts and remains controllable | Not run | Not run |
+| Grant heart-rate permission | New session records available heart-rate samples without changing timer ownership | Not run | Not run |
+| Notification tap | Active-session notification reopens the Wear activity | Not run | Not run |
+| Phone-originated start / pause / resume / finish | One Wear-owned session responds once to each command | Not run | Not run |
+| Second phone session | Completed summary and setup coexist; next start gets a different ID and retains history | Not run | Not run |
 | 15-minute screen-off session | Timer error within release threshold; each expected cue once | Not run | Blocked |
 | 30-minute screen-off session | Timer remains active with distinct start/interval/end haptics | Not run | Blocked |
 | 180-minute screen-off session | Timer error ≤2 seconds; no duplicate cue or duplicate record | Not run | Blocked |
@@ -29,7 +37,7 @@ install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. The remote-install confirmation is waiting for the account holder's Google
 Passkey verification. No runtime, Health Connect, Data Layer, timing, haptic, or
 recovery result is inferred from track activation or device recognition, so the
-physical-device rows above remain `Blocked` until observed.
+physical-device rows above remain `Not run` or `Blocked` until observed.
 
 ## Operator evidence template
 
