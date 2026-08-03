@@ -39,6 +39,20 @@ Passkey verification. No runtime, Health Connect, Data Layer, timing, haptic, or
 recovery result is inferred from track activation or device recognition, so the
 physical-device rows above remain `Not run` or `Blocked` until observed.
 
+## Current physical connectivity boundary
+
+On 2026-08-03, Android's companion-device service on the attached phone still
+reported an approved Pixel Watch 4 association and an active secure companion
+transport. This proves pairing only. `adb devices -l` and ADB mDNS discovery
+exposed the phone alone, so the watch application, foreground service, database,
+permissions, and logs could not be inspected. No watch serial, address, or
+health value is retained in this record.
+
+The Play-installed phone package read back as production `0.1.0` / `1000001`;
+it had not yet updated to internal `0.1.2`. This is consistent with the pending
+Google Passkey confirmation for remote installation and is not a failure of the
+active internal track.
+
 ## Operator evidence template
 
 For each physical row, append:
