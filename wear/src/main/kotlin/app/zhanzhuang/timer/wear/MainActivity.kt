@@ -28,6 +28,7 @@ import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.SessionStatus
+import app.zhanzhuang.timer.model.shouldRequestNotificationPermission
 import app.zhanzhuang.timer.wear.session.WearSessionService
 import app.zhanzhuang.timer.wear.session.WearSessionUiBridge
 import app.zhanzhuang.timer.wear.session.WearSessionUiState
@@ -45,6 +46,9 @@ import kotlinx.coroutines.flow.map
 class MainActivity : ComponentActivity() {
     private var permissionPrompt by mutableStateOf(false)
     private var pendingConfig by mutableStateOf(SessionConfig())
+    private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        continueStartAfterNotificationPermission()
+    }
     private val requestHeartRate = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         permissionPrompt = false
         startSession(pendingConfig)
@@ -58,7 +62,12 @@ class MainActivity : ComponentActivity() {
                     permissionPrompt = permissionPrompt,
                     onStart = { config ->
                         pendingConfig = config
-                        if (needsHeartRatePermission()) permissionPrompt = true else startSession(config)
+                        val granted = Build.VERSION.SDK_INT < 33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        if (shouldRequestNotificationPermission(Build.VERSION.SDK_INT, granted)) {
+                            requestNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            continueStartAfterNotificationPermission()
+                        }
                     },
                     onRequestPermission = { requestHeartRate.launch(heartRatePermissions()) },
                     onContinueWithoutHeartRate = { permissionPrompt = false; startSession(pendingConfig) },
@@ -70,6 +79,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         sendService(WearSessionService.ACTION_STATUS)
+    }
+
+    private fun continueStartAfterNotificationPermission() {
+        if (needsHeartRatePermission()) permissionPrompt = true else startSession(pendingConfig)
     }
 
     private fun startSession(config: SessionConfig) {

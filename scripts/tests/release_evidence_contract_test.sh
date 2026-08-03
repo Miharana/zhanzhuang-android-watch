@@ -29,6 +29,9 @@ require_text "$checks" 'resolve_java_home'
 require_text "$checks" 'export ANDROID_HOME='
 require_text "$checks" 'app.zhanzhuang.timer.debug'
 require_text "$checks" 'versionName'
+require_text "$checks" "versionName='0.1.1'"
+require_text "$checks" '1000002'
+require_text "$checks" '2000002'
 require_text "$checks" "sdkVersion:'"
 require_text "$checks" "targetSdkVersion:'"
 require_text "$checks" "compileSdkVersion='36'"
@@ -40,6 +43,8 @@ require_text "$checks" 'app.zhanzhuang.timer'
 require_text "$checks" 'android.hardware.type.watch'
 require_text "$checks" 'com.google.android.wearable.standalone'
 require_text "$checks" 'FOREGROUND_SERVICE_HEALTH'
+require_text "$checks" '0x40000100'
+require_text "$checks" 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE'
 require_text "$checks" 'READ_HEART_RATE'
 require_text "$checks" 'config zh-rCN'
 require_text "$checks" 'dump --values resources'

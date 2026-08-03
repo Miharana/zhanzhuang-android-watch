@@ -1,1 +1,1 @@
-Start another standing session immediately after finishing while keeping your history. Improved phone-to-watch reconnection, safer Wear launch without heart-rate permission, and a new gold holding-ball icon.
+Start another standing session immediately after finishing with a start button that stays in reach. Adds contextual notification permission, clearer system bars, improved phone-to-watch reconnection, safer Wear launch without heart-rate permission, and the gold holding-ball icon.

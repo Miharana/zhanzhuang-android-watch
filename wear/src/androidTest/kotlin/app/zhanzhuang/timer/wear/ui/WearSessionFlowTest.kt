@@ -31,7 +31,12 @@ class WearSessionFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Before fun denyHeartRateForDurationOnlyFlow() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.revokeRuntimePermission(
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.grantRuntimePermission(
+            "app.zhanzhuang.timer.debug",
+            Manifest.permission.POST_NOTIFICATIONS,
+        )
+        automation.revokeRuntimePermission(
             "app.zhanzhuang.timer.debug",
             Manifest.permission.BODY_SENSORS,
         )

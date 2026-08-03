@@ -3,6 +3,7 @@ package app.zhanzhuang.timer.mobile.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -55,28 +56,45 @@ fun TrainingScreen(
 ) {
     val active = state.session?.status in ACTIVE_STATUSES
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxSize(),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text(stringResource(R.string.brand_chinese), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.standing_meditation), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text(stringResource(R.string.brand_chinese), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.standing_meditation), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(stringResource(R.string.history), onHistory)
+                    TextButton(stringResource(R.string.settings), onSettings)
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(stringResource(R.string.history), onHistory)
-                TextButton(stringResource(R.string.settings), onSettings)
+            HorizontalDivider()
+            when {
+                active -> ActiveTraining(state, onPause, onResume, onFinish, onCancel)
+                state.session?.status in TERMINAL_STATUSES -> {
+                    TerminalTraining(state)
+                    HorizontalDivider()
+                    SetupTraining(state, onDurationChange, onIntervalChange)
+                }
+                else -> SetupTraining(state, onDurationChange, onIntervalChange)
             }
         }
-        HorizontalDivider()
-        when {
-            active -> ActiveTraining(state, onPause, onResume, onFinish, onCancel)
-            state.session?.status in TERMINAL_STATUSES -> {
-                TerminalTraining(state)
-                HorizontalDivider()
-                SetupTraining(state, onDurationChange, onIntervalChange, onStart)
-            }
-            else -> SetupTraining(state, onDurationChange, onIntervalChange, onStart)
+        if (!active) {
+            Button(
+                onClick = onStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+            ) { Text(stringResource(R.string.start_standing), fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -102,7 +120,6 @@ private fun SetupTraining(
     state: TrainingUiState,
     onDurationChange: (Int) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onStart: () -> Unit,
 ) {
     Text(stringResource(R.string.duration), style = MaterialTheme.typography.titleLarge)
     Stepper(
@@ -116,11 +133,6 @@ private fun SetupTraining(
     ChoiceFlow(intervals, state.config.intervalMinutes, { stringResource(R.string.every_minutes, it) }, onIntervalChange)
     Text(stringResource(R.string.haptic_explanation), color = MaterialTheme.colorScheme.onSurfaceVariant)
     WatchStatus(state)
-    Button(
-        onClick = onStart,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-    ) { Text(stringResource(R.string.start_standing), fontWeight = FontWeight.Bold) }
 }
 
 @Composable
