@@ -2,25 +2,27 @@
 
 Last updated: 2026-08-03 (UTC)
 
-## Production release identity (unchanged)
+## Current production review identity
 
 - Developer: **Urticad Tech Ltd** (organisation account)
 - Developer ID: `7258731265136907307`
 - Play app ID: `4973495334373549508`
 - Package: `app.zhanzhuang.timer`
-- Version name: `0.1.0`
+- Version name: `0.1.4`
 - Upload certificate SHA-256:
   `83:FC:DF:02:8E:8B:E3:82:6C:AD:A6:86:76:08:A6:95:9C:77:5F:CA:D6:98:E7:13:FE:02:7A:07:0E:12:7C:81`
 
 | Surface | Version code | Candidate | SHA-256 |
 | --- | ---: | --- | --- |
-| Phones/tablets | `1000001` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `a4c0a96f1994fb09af77f9598ef6e67087ca40070d6c6595f82fff0832eb8d5d` |
-| Wear OS | `2000001` | `wear/build/outputs/bundle/release/wear-release.aab` | `bc158ad05801f07f34dc8c506694cfab1991d9e93d1f3b40b4fb844d7bef6199` |
+| Phones/tablets | `1000005` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `c424765c60c9382803d3503bcfffb49f14aaf3cc14194b9eab7f52ce6ed885cd` |
+| Wear OS | `2000005` | `wear/build/outputs/bundle/release/wear-release.aab` | `80ed4c351acd54e00c3d82f69c0001cc1629773a47567e7ad7f684c00a7e5c7d` |
 
 The immutable candidates passed unit tests, mobile and Wear release lint,
 release bundle builds, JAR signature verification, upload-certificate matching,
 bundle manifest inspection, package/version checks, target SDK 36 checks, and
-the no-Internet/no-location release contract.
+the no-Internet/no-location release contract. Android Publisher reports both
+production tracks as `0.1.4` / `completed`, while Play Console groups both
+full-rollout changes under **Changes in review**.
 
 ## 0.1.1 internal release
 
@@ -125,6 +127,43 @@ not used as icon-upload evidence. Physical launcher and paired runtime evidence
 remains separate because the Mac did not enumerate either device through ADB
 after the upload.
 
+## 0.1.4 internal and production review release
+
+Source commit: `12f42ec`
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000005` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10716027` | `c424765c60c9382803d3503bcfffb49f14aaf3cc14194b9eab7f52ce6ed885cd` |
+| Wear OS | `2000005` | `wear/build/outputs/bundle/release/wear-release.aab` | `10206604` | `80ed4c351acd54e00c3d82f69c0001cc1629773a47567e7ad7f684c00a7e5c7d` |
+
+The launcher was simplified so the hands meet one borderless gold-and-soil
+taiji at its sides and stop above the lower edge. The arm paths no longer form
+an outer ball ring. Phone, Wear, monochrome, canonical SVG, and all three Play
+listing icons share this rule. The rendered 512 px RGBA listing icon has
+SHA-256 `f98751a274283950cf8724bab47c37d65c8eddf871161224e17625f4711829a3`;
+Android Publisher returned that exact hash for `en-GB`, `en-US`, and `zh-CN`.
+
+The clean-free debug gate forcibly reran 188 Gradle tasks and passed all JVM
+tests, mobile and Wear debug lint, both APK builds, release manifests, package
+and version identity, permissions, and localized resources. The signed verifier
+then passed 206 Gradle tasks, release lint, store-image contracts, both AAB
+builds, strict JAR integrity, the approved upload certificate, and bundletool
+manifest checks. A concurrent-service test initially failed because a finishing
+ticker can safely repeat `stopSelfResult` for the old start ID; its assertion
+now verifies the real invariant that every stop request targets only the old ID
+and never the newly started session.
+
+Both AABs were uploaded to internal testing and read back as
+`0.1.4|completed|1000005` and `0.1.4|completed|2000005`. The verified versions
+were then promoted to `production` and `wear:production` with full-rollout
+`completed` status. A fresh Android Publisher readback returned the same
+version codes on both production tracks. Play Console Publishing overview
+lists **0.1.4 — Start full rollout** under both **Production** and
+**Production (Wear OS)** inside **Changes in review**. At the evidence time,
+Google's quick automated checks were running with an estimate of up to 13
+minutes; the page states that the changes will proceed to review automatically
+after those checks pass. There was no remaining send-for-review action.
+
 ## Google Play remote state
 
 The established Miharana Fastlane service account was granted only the app-
@@ -133,10 +172,10 @@ and production releases. It has no account administration or finance access.
 
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
-| Phones/tablets | `internal` | `1000004` | `0.1.3` / `completed` / Active |
-| Wear OS | `wear:internal` | `2000004` | `0.1.3` / `completed` / Active |
-| Phones/tablets | `production` | `1000001` | `completed`; first release is still in Play review |
-| Wear OS | `wear:production` | `2000001` | `completed`; first release is still in Play review |
+| Phones/tablets | `internal` | `1000005` | `0.1.4` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000005` | `0.1.4` / `completed` / Active |
+| Phones/tablets | `production` | `1000005` | `0.1.4` / `completed`; listed under Changes in review |
+| Wear OS | `wear:production` | `2000005` | `0.1.4` / `completed`; listed under Changes in review |
 
 The first production promotions were deliberately created as `draft`, because
 Google Play rejects a non-draft production release while the app itself is
@@ -147,7 +186,8 @@ with both manifests. All 15 first-release changes were submitted. Publishing
 overview confirmed **15 changes sent for review** and now groups them under
 **Changes in review**. A later Publishing overview readback no longer showed
 the automated quick-check progress or any issue, while the submission remained
-under **Changes in review**.
+under **Changes in review**. Version `0.1.4` subsequently replaced both
+production candidates and was submitted as described above.
 
 Internal tester list: `Internal Testers` (2 users)
 
