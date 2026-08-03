@@ -29,9 +29,9 @@ require_text "$checks" 'resolve_java_home'
 require_text "$checks" 'export ANDROID_HOME='
 require_text "$checks" 'app.zhanzhuang.timer.debug'
 require_text "$checks" 'versionName'
-require_text "$checks" "versionName='0.1.2'"
-require_text "$checks" '1000003'
-require_text "$checks" '2000003'
+require_text "$checks" "versionName='0.1.3'"
+require_text "$checks" '1000004'
+require_text "$checks" '2000004'
 require_text "$checks" "sdkVersion:'"
 require_text "$checks" "targetSdkVersion:'"
 require_text "$checks" "compileSdkVersion='36'"

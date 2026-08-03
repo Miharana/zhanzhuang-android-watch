@@ -13,8 +13,8 @@ android {
         applicationId = "app.zhanzhuang.timer"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2_000_003
-        versionName = "0.1.2"
+        versionCode = 2_000_004
+        versionName = "0.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

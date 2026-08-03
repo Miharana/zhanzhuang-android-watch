@@ -4,6 +4,12 @@
   <g id="holding-ball-figure" fill="none" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="256" cy="145" r="34" stroke="#E7D5A6" stroke-width="22"/>
     <path d="M224 219 Q256 199 288 219 M256 215 L256 321 M256 292 L205 385 M256 292 L307 385" stroke="#C6A867" stroke-width="26"/>
+    <g id="gold-taiji" stroke="none">
+      <circle cx="256" cy="268" r="34" fill="#C6A867" stroke="#E7D5A6" stroke-width="4"/>
+      <path id="taiji-soil-half" d="M256 234 A34 34 0 0 1 256 302 A17 17 0 0 1 256 268 A17 17 0 0 0 256 234 Z" fill="#241C12"/>
+      <circle id="taiji-soil-dot" cx="256" cy="251" r="4.5" fill="#241C12"/>
+      <circle id="taiji-gold-dot" cx="256" cy="285" r="4.5" fill="#E7D5A6"/>
+    </g>
     <path d="M222 225 C185 243 180 285 198 315 C214 335 232 320 239 295" stroke="#A9863F" stroke-width="22"/>
     <path d="M290 225 C327 243 332 285 314 315 C298 335 280 320 273 295" stroke="#D8C18C" stroke-width="22"/>
     <path d="M237 211 Q256 203 275 211" stroke="#E7D5A6" stroke-width="9"/>
