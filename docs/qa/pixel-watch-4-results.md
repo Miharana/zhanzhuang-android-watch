@@ -1,6 +1,6 @@
 # Pixel Watch 4 physical QA results
 
-Date: 2026-08-02
+Date: 2026-08-03
 
 Physical Pixel Watch 4 evidence for `0.1.1` is **not run**: `adb devices -l`
 returned no attached devices during this build. Nothing below is a pass
@@ -8,6 +8,7 @@ inferred from emulator, unit tests, or local build output.
 
 | Scenario | Expected observation | Observed result | Status |
 | --- | --- | --- | --- |
+| Unified launcher identity | Phone and watch show the standing figure holding a gold taiji | Source, APK resources, and Play asset pass automated checks; physical launchers not observed | Not run |
 | Cold launch before heart-rate permission | App opens setup without a foreground-service crash | Not run | Not run |
 | Continue without heart rate | Duration-only timer starts and remains controllable | Not run | Not run |
 | Grant heart-rate permission | New session records available heart-rate samples without changing timer ownership | Not run | Not run |
@@ -31,7 +32,7 @@ A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear in
 ## Play-delivered build status
 
 Play delivery is **ready for physical testing**. The phone and Wear OS internal
-tracks are active with version `0.1.2` (`1000003` / `2000003`); the shared tester list is enabled on
+tracks are active with version `0.1.3` (`1000004` / `2000004`); the shared tester list is enabled on
 both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. The remote-install confirmation is waiting for the account holder's Google
@@ -41,15 +42,18 @@ physical-device rows above remain `Not run` or `Blocked` until observed.
 
 ## Current physical connectivity boundary
 
-On 2026-08-03, Android's companion-device service on the attached phone still
+Earlier on 2026-08-03, Android's companion-device service on the attached phone
 reported an approved Pixel Watch 4 association and an active secure companion
-transport. This proves pairing only. `adb devices -l` and ADB mDNS discovery
-exposed the phone alone, so the watch application, foreground service, database,
-permissions, and logs could not be inspected. No watch serial, address, or
-health value is retained in this record.
+transport. This proves pairing only. After the 0.1.3 upload, `adb devices -l`
+returned no attached target; ADB mDNS advertised only the phone but could not
+establish a connection, and macOS USB inventory did not enumerate a Pixel or
+Android device. Therefore neither installed launcher, watch application,
+foreground service, database, permissions, nor logs could be inspected. No
+watch serial, address, or health value is retained in this record.
 
 The Play-installed phone package read back as production `0.1.0` / `1000001`;
-it had not yet updated to internal `0.1.2`. This is consistent with the pending
+it had not yet updated to internal `0.1.2`. A fresh installed-version readback
+for `0.1.3` was not possible without ADB. This is consistent with the pending
 Google Passkey confirmation for remote installation and is not a failure of the
 active internal track.
 

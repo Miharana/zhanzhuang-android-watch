@@ -76,7 +76,7 @@
 - [x] **Step 1: Run `scripts/run_android_checks.sh` with explicit Java 17 and Android SDK paths.**
 - [x] **Step 2: Build signed release bundles with repo-external signing secrets.**
 - [x] **Step 3: Run `scripts/verify_release.sh` against the signed AABs.**
-- [ ] **Step 4: Record artifact hashes and automated test evidence.**
+- [x] **Step 4: Record artifact hashes and automated test evidence.**
 
 ### Task 4: Upload and read back internal tracks
 
@@ -88,10 +88,10 @@
 - Consumes: signed 0.1.3 AABs and repo-external Google Play service-account JSON.
 - Produces: completed `internal=1000004` and `wear:internal=2000004` Play releases, with production unchanged.
 
-- [ ] **Step 1: Read current phone, Wear, and production track state.**
-- [ ] **Step 2: Upload phone AAB to `internal` with release status `completed`.**
-- [ ] **Step 3: Upload Wear AAB to `wear:internal` with release status `completed`.**
-- [ ] **Step 4: Read back both tracks and confirm production remains 0.1.0.**
+- [x] **Step 1: Read current phone, Wear, and production track state.**
+- [x] **Step 2: Upload phone AAB to `internal` with release status `completed`.**
+- [x] **Step 3: Upload Wear AAB to `wear:internal` with release status `completed`.**
+- [x] **Step 4: Read back both tracks and confirm production remains 0.1.0.**
 
 ### Task 5: Complete physical-device proof when ADB is available
 
@@ -102,7 +102,7 @@
 - Consumes: Pixel phone and Pixel Watch 4 with 0.1.3 installed.
 - Produces: launcher-icon, cold-launch, watch-start, phone reflection, pause/resume, completion, reconnect, and duplicate-prevention results.
 
-- [ ] **Step 1: Confirm Mac enumerates the phone or watch with `adb devices -l`.**
+- [x] **Step 1: Check whether Mac enumerates the phone or watch with `adb devices -l`.**
 - [ ] **Step 2: Install the matching build and verify the gold taiji launcher on phone and watch.**
 - [ ] **Step 3: Run the paired session matrix and collect anonymized evidence.**
 - [ ] **Step 4: Record Pass/Fail/Not run without treating missing ADB as a product pass.**

@@ -88,6 +88,37 @@ returned `0.1.2|completed|1000003` for `internal` and
 physical runtime evidence remains separate and is not inferred from the Play
 upload or the phone-only instrumentation run.
 
+## 0.1.3 internal release
+
+Source commit: `902ab6c2e1fc60667cd8d5e6441d49a300bf634a`
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000004` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10715950` | `3fd59f8b094e311eadfa44c248a557dee89bdc4a79f701cd3f371b467879739f` |
+| Wear OS | `2000004` | `wear/build/outputs/bundle/release/wear-release.aab` | `10206537` | `8adeeec7ea1293fd2e616b29f1c83fe231673cad237903639fec2ed9ccfa02dc` |
+
+The 0.1.3 phone and Wear launchers now use the same adaptive foreground: a
+standing gold figure holds a gold-and-soil taiji with two contrasting dots.
+The matching monochrome assets preserve the taiji contour, and the canonical
+SVG generated identical 512 px RGBA Play icons for `en-GB`, `en-US`, and
+`zh-CN`. Resource contract tests first failed on the missing taiji identifiers
+and passed after all phone, Wear, monochrome, and store assets were aligned.
+
+The clean-free debug gate forcibly reran 188 Gradle tasks and passed all JVM
+tests, both debug lint gates, both debug APK builds, release-manifest checks,
+version/package checks, permission contracts, and localized resources. The
+signed verifier passed 206 Gradle tasks plus release lint, store-image
+contracts, strict JAR integrity, upload-certificate matching, and bundletool
+identity checks for both AABs.
+
+Both candidates were uploaded on 2026-08-03 UTC. Android Publisher readback
+returned `0.1.3|completed|1000004` for `internal` and
+`0.1.3|completed|2000004` for `wear:internal`. Production remained
+`0.1.0|completed|1000001` and `0.1.0|completed|2000001`. The Play listing icon
+was uploaded with the phone internal release. Physical launcher and paired
+runtime evidence remains separate because the Mac did not enumerate either
+device through ADB after the upload.
+
 ## Google Play remote state
 
 The established Miharana Fastlane service account was granted only the app-
@@ -96,8 +127,8 @@ and production releases. It has no account administration or finance access.
 
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
-| Phones/tablets | `internal` | `1000003` | `0.1.2` / `completed` / Active |
-| Wear OS | `wear:internal` | `2000003` | `0.1.2` / `completed` / Active |
+| Phones/tablets | `internal` | `1000004` | `0.1.3` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000004` | `0.1.3` / `completed` / Active |
 | Phones/tablets | `production` | `1000001` | `completed`; first release is still in Play review |
 | Wear OS | `wear:production` | `2000001` | `completed`; first release is still in Play review |
 
