@@ -57,6 +57,37 @@ matrix remains required because the attached ADB target during this candidate
 run was the phone, not the watch. The active `0.1.0` production review remains
 untouched.
 
+## 0.1.2 internal release
+
+Source commit: `59a60f9422f7e6641c19200cd618a6a638573c24`
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000003` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10715493` | `da3b87b725bfb27fc59aafeed93519c5ef92ae0a6d389b67ba8efe0fb0f9b505` |
+| Wear OS | `2000003` | `wear/build/outputs/bundle/release/wear-release.aab` | `10206080` | `e4110a5d27793139c5dac7b1adf83a9a1219081e4ee7c138f9cdf9bdeff8a173` |
+
+The 0.1.2 Wear foreground service now publishes the durable Wear-owned session
+state before its ephemeral countdown updates at forced synchronization points.
+This closes the ordering gap where a watch-local start could send runtime data
+that the phone correctly rejected because it had not yet learned the session
+identity and ownership. A regression contract failed on the old ordering and
+passed after the state-before-runtime change.
+
+The clean-free debug gate forcibly reran 188 Gradle tasks and passed all JVM
+tests, both debug lint gates, both debug APK builds, release-manifest checks,
+version/package checks, permission contracts, and localized resources. The
+connected Pixel 10 Pro (Android 17/API 37) passed all six mobile instrumentation
+tests. The signed verifier then passed 206 Gradle tasks plus release lint,
+store assets, strict JAR integrity, upload-certificate matching, and bundletool
+identity checks for both AABs.
+
+Both candidates were uploaded on 2026-08-03 UTC. Android Publisher readback
+returned `0.1.2|completed|1000003` for `internal` and
+`0.1.2|completed|2000003` for `wear:internal`. Production remained
+`0.1.0|completed|1000001` and `0.1.0|completed|2000001`. Pixel Watch 4
+physical runtime evidence remains separate and is not inferred from the Play
+upload or the phone-only instrumentation run.
+
 ## Google Play remote state
 
 The established Miharana Fastlane service account was granted only the app-
@@ -65,8 +96,8 @@ and production releases. It has no account administration or finance access.
 
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
-| Phones/tablets | `internal` | `1000002` | `0.1.1` / `completed` / Active |
-| Wear OS | `wear:internal` | `2000002` | `0.1.1` / `completed` / Active |
+| Phones/tablets | `internal` | `1000003` | `0.1.2` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000003` | `0.1.2` / `completed` / Active |
 | Phones/tablets | `production` | `1000001` | `completed`; first release is still in Play review |
 | Wear OS | `wear:production` | `2000001` | `completed`; first release is still in Play review |
 

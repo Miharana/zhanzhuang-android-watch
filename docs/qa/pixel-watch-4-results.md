@@ -31,7 +31,7 @@ A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear in
 ## Play-delivered build status
 
 Play delivery is **ready for physical testing**. The phone and Wear OS internal
-tracks are active with version `0.1.0`; the shared tester list is enabled on
+tracks are active with version `0.1.2` (`1000003` / `2000003`); the shared tester list is enabled on
 both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. The remote-install confirmation is waiting for the account holder's Google

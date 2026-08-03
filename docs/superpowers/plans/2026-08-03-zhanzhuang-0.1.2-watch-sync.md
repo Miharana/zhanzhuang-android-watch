@@ -168,11 +168,11 @@ Expected: evidence records exact, non-placeholder values from the fresh signed a
 - Consumes: signed 0.1.2 AABs and the repo-external Google Play service account.
 - Produces: Android Publisher readback for `internal=1000003` and `wear:internal=2000003`, plus Pixel Watch 4 runtime evidence.
 
-- [ ] **Step 1: Read back current remote tracks before mutation**
+- [x] **Step 1: Read back current remote tracks before mutation**
 
 Expected baseline: internal tracks contain 0.1.1 and production tracks remain 0.1.0.
 
-- [ ] **Step 2: Upload phone and Wear AABs sequentially**
+- [x] **Step 2: Upload phone and Wear AABs sequentially**
 
 ```bash
 SUPPLY_JSON_KEY="$HOME/.config/miharana/google-play/miharana-fastlane-supply.json" \
@@ -183,7 +183,7 @@ SUPPLY_JSON_KEY="$HOME/.config/miharana/google-play/miharana-fastlane-supply.jso
 
 Expected: both uploads finish successfully; no production lane runs.
 
-- [ ] **Step 3: Read back all four tracks**
+- [x] **Step 3: Read back all four tracks**
 
 Expected: `internal=0.1.2|completed|1000003`, `wear:internal=0.1.2|completed|2000003`, and both production tracks remain `0.1.0|completed`.
 
