@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-03 (UTC)
 
-## Release identity
+## Production release identity (unchanged)
 
 - Developer: **Urticad Tech Ltd** (organisation account)
 - Developer ID: `7258731265136907307`
@@ -22,7 +22,7 @@ release bundle builds, JAR signature verification, upload-certificate matching,
 bundle manifest inspection, package/version checks, target SDK 36 checks, and
 the no-Internet/no-location release contract.
 
-## 0.1.1 internal candidate (not uploaded)
+## 0.1.1 internal release
 
 Source commit: `a241073e035057c50be52d8588c359d661dcdf45`
 
@@ -49,7 +49,10 @@ notification-permission state was also exercised manually: Start produced the
 system prompt; allowing it produced notification ID `1001` and a running
 special-use foreground service; the test session then completed cleanly.
 
-These files have not been uploaded to Google Play. The Pixel Watch 4 physical
+Both files were uploaded to their existing internal-testing tracks on
+2026-08-03 UTC. Android Publisher readback after both commits returned
+`0.1.1|completed|1000002` for `internal` and
+`0.1.1|completed|2000002` for `wear:internal`. The Pixel Watch 4 physical
 matrix remains required because the attached ADB target during this candidate
 run was the phone, not the watch. The active `0.1.0` production review remains
 untouched.
@@ -62,8 +65,8 @@ and production releases. It has no account administration or finance access.
 
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
-| Phones/tablets | `internal` | `1000001` | `completed` / Active |
-| Wear OS | `wear:internal` | `2000001` | `completed` / Active |
+| Phones/tablets | `internal` | `1000002` | `0.1.1` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000002` | `0.1.1` / `completed` / Active |
 | Phones/tablets | `production` | `1000001` | `completed`; first release is still in Play review |
 | Wear OS | `wear:production` | `2000001` | `completed`; first release is still in Play review |
 
