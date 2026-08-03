@@ -1,6 +1,6 @@
 # Google Play release evidence
 
-Last updated: 2026-08-02 (UTC)
+Last updated: 2026-08-03 (UTC)
 
 ## Release identity
 
@@ -24,24 +24,35 @@ the no-Internet/no-location release contract.
 
 ## 0.1.1 internal candidate (not uploaded)
 
-Source commit: `e0f6200f2a3a236adc7bb378e49d616a7f366067`
+Source commit: `a241073e035057c50be52d8588c359d661dcdf45`
 
-| Surface | Version code | Candidate | SHA-256 |
-| --- | ---: | --- | --- |
-| Phones/tablets | `1000002` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `7ef4f2e0cdfaa7fbd66075180a787147e40d0bf585adcabc21dc2777d287c8c3` |
-| Wear OS | `2000002` | `wear/build/outputs/bundle/release/wear-release.aab` | `7d32afffd7f23c1645f3fb87c614fdc9a6137da777f73e9591164e066a00962c` |
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000002` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10715490` | `3dacf0b628287f20a59689f9f7f95e85ac793f6d2d0d7cbccee7463aa2f71204` |
+| Wear OS | `2000002` | `wear/build/outputs/bundle/release/wear-release.aab` | `10205881` | `49ebc700f814b6693749de0a71e864b0551614e1a83e8a8b7378be824591c53d` |
 
 Both candidates were rebuilt from the committed `0.1.1` identity without a
 Gradle clean task. Bundletool readback confirms package
 `app.zhanzhuang.timer`, version name `0.1.1`, target SDK 36, and version codes
 `1000002` / `2000002`. `jarsigner` reports both jars verified, and both upload
-certificates match the established SHA-256 above. The four-module JVM suite,
-both debug APKs, mobile instrumentation APK compilation, both release bundles,
-and release lint-vital tasks passed.
+certificates match the established SHA-256 above. The full debug gate reran
+188 Gradle tasks and passed both app test suites, both lint gates, both debug
+APKs, release manifests, permission contracts, and bilingual resources. The
+signed verifier then passed all JVM tests, both release lint gates, store
+metadata/assets, both AAB builds, strict JAR integrity, certificate matching,
+and bundle manifest inspection.
 
-These files have not been uploaded to Google Play. The connected mobile flow
-and Pixel Watch 4 matrix remain required because no ADB device was attached
-during this build. The active `0.1.0` production review remains untouched.
+The connected Pixel 10 Pro (Android 17/API 37) passed six mobile instrumentation
+tests, including a durable completion followed by a distinct second session,
+large-font reachability, and light-theme status-bar contrast. A fresh
+notification-permission state was also exercised manually: Start produced the
+system prompt; allowing it produced notification ID `1001` and a running
+special-use foreground service; the test session then completed cleanly.
+
+These files have not been uploaded to Google Play. The Pixel Watch 4 physical
+matrix remains required because the attached ADB target during this candidate
+run was the phone, not the watch. The active `0.1.0` production review remains
+untouched.
 
 ## Google Play remote state
 
