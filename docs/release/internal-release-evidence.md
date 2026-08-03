@@ -165,8 +165,9 @@ invite for `scorpiocn@gmail.com`, and its install picker recognizes the paired
 Google Pixel Watch 4 and Google Pixel 10 Pro. Remote installation still requires
 the account holder's Google Passkey confirmation. The 0.1.3 Pixel Watch 4
 request subsequently passed that verification and Play confirmed it would be
-installed soon. A separate Pixel 10 Pro request is waiting for its own Passkey
-confirmation; neither message is treated as installed-version or runtime proof.
+installed soon. The separate Pixel 10 Pro request also passed its Passkey
+verification and received the same install-soon confirmation. Neither message
+is treated as installed-version, launcher-rendering, or runtime proof.
 
 ## Store and policy setup
 

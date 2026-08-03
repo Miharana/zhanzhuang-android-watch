@@ -39,11 +39,12 @@ Pro. After the 0.1.3 upload, the install picker selected Pixel Watch 4 and
 accepted the Install action. The account holder completed Google Passkey
 verification, and Play returned the explicit confirmation that the app would be
 installed on the device soon. A second request selected Pixel 10 Pro so the
-phone launcher can receive the same 0.1.3 identity; that request is waiting at
-a fresh Google Passkey verification page left visible in the in-app browser.
-No installed version, launcher appearance, runtime, Health Connect, Data Layer,
-timing, haptic, or recovery result is inferred from either remote request, so
-the physical-device rows above remain `Not run` or `Blocked` until observed.
+phone launcher can receive the same 0.1.3 identity. The account holder also
+completed that Google Passkey challenge, and Play returned the same explicit
+install-soon confirmation for the phone. No installed version, launcher
+appearance, runtime, Health Connect, Data Layer, timing, haptic, or recovery
+result is inferred from either remote request, so the physical-device rows
+above remain `Not run` or `Blocked` until observed.
 
 ## Current physical connectivity boundary
 
@@ -55,6 +56,11 @@ establish a connection, and macOS USB inventory did not enumerate a Pixel or
 Android device. Therefore neither installed launcher, watch application,
 foreground service, database, permissions, nor logs could be inspected. No
 watch serial, address, or health value is retained in this record.
+
+After both remote-install confirmations, the phone continued to advertise an
+ADB TLS-connect service over mDNS, but `adb connect` failed and a fresh
+`adb devices -l` still returned no target. The advertisement alone is not an
+authorized debug connection and is not used as physical-device evidence.
 
 The Play-installed phone package read back as production `0.1.0` / `1000001`;
 it had not yet updated to internal `0.1.2`. A fresh installed-version readback
