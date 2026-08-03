@@ -5,13 +5,13 @@
     <circle cx="256" cy="145" r="34" stroke="#E7D5A6" stroke-width="22"/>
     <path d="M224 219 Q256 199 288 219 M256 215 L256 321 M256 292 L205 385 M256 292 L307 385" stroke="#C6A867" stroke-width="26"/>
     <g id="gold-taiji" stroke="none">
-      <circle cx="256" cy="268" r="34" fill="#C6A867" stroke="#E7D5A6" stroke-width="4"/>
+      <circle id="taiji-disc" cx="256" cy="268" r="34" fill="#C6A867"/>
       <path id="taiji-soil-half" d="M256 234 A34 34 0 0 1 256 302 A17 17 0 0 1 256 268 A17 17 0 0 0 256 234 Z" fill="#241C12"/>
       <circle id="taiji-soil-dot" cx="256" cy="251" r="4.5" fill="#241C12"/>
       <circle id="taiji-gold-dot" cx="256" cy="285" r="4.5" fill="#E7D5A6"/>
     </g>
-    <path d="M222 225 C185 243 180 285 198 315 C214 335 232 320 239 295" stroke="#A9863F" stroke-width="22"/>
-    <path d="M290 225 C327 243 332 285 314 315 C298 335 280 320 273 295" stroke="#D8C18C" stroke-width="22"/>
+    <path id="left-holding-arm" d="M222 225 C192 241 191 270 213 283 C220 287 225 280 226 272" stroke="#A9863F" stroke-width="22"/>
+    <path id="right-holding-arm" d="M290 225 C320 241 321 270 299 283 C292 287 287 280 286 272" stroke="#D8C18C" stroke-width="22"/>
     <path d="M237 211 Q256 203 275 211" stroke="#E7D5A6" stroke-width="9"/>
   </g>
   <path d="M383 113L391 139L417 147L391 155L383 181L375 155L349 147L375 139Z" fill="#FFF4D6"/>

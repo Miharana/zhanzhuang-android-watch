@@ -42,7 +42,7 @@ raw_signing=$(git grep -nE 'ZHANZHUANG_(STORE|KEY)_PASSWORD[[:space:]]*=[^[:spac
 
 for locale in en-GB en-US zh-CN; do
     locale_dir="fastlane/metadata/android/$locale"
-    for metadata in title.txt short_description.txt full_description.txt changelogs/1000004.txt changelogs/2000004.txt; do
+    for metadata in title.txt short_description.txt full_description.txt changelogs/1000005.txt changelogs/2000005.txt; do
         require_file "$locale_dir/$metadata"
     done
     [[ $(wc -m < "$locale_dir/title.txt") -le 30 ]] || fail "$locale title exceeds 30 characters"
@@ -83,7 +83,7 @@ require_text fastlane/Fastfile 'promote_mobile_production'
 require_text fastlane/Fastfile 'track_promote_to: "production"'
 require_text fastlane/Fastfile 'promote_wear_production'
 require_text fastlane/Fastfile 'track_promote_to: "wear:production"'
-require_text fastlane/Fastfile 'track_promote_release_status: "draft"'
+require_text fastlane/Fastfile 'track_promote_release_status: "completed"'
 
 ./gradlew test :mobile:lintRelease :wear:lintRelease :mobile:bundleRelease :wear:bundleRelease
 
@@ -129,7 +129,7 @@ verify_bundle_manifest() {
     manifest=$($bundletool dump manifest --bundle="$aab") || fail "$module AAB manifest cannot be read"
     [[ "$manifest" == *'package="app.zhanzhuang.timer"'* ]] || fail "$module AAB package is incorrect"
     [[ "$manifest" == *"versionCode=\"$version_code\""* ]] || fail "$module AAB version code is incorrect"
-    [[ "$manifest" == *'versionName="0.1.3"'* ]] || fail "$module AAB version name is incorrect"
+    [[ "$manifest" == *'versionName="0.1.4"'* ]] || fail "$module AAB version name is incorrect"
     [[ "$manifest" == *'targetSdkVersion="36"'* ]] || fail "$module AAB target SDK is incorrect"
     [[ "$manifest" == *'android.permission.INTERNET'* ]] && fail "$module AAB must not request INTERNET"
     [[ "$manifest" == *'android.permission.ACCESS_FINE_LOCATION'* ]] && fail "$module AAB must not request location"
@@ -143,8 +143,8 @@ verify_bundle_manifest() {
         [[ "$manifest" != *'android.hardware.type.watch'* ]] || fail 'mobile AAB must not require watch hardware'
     fi
 }
-verify_bundle_manifest mobile "$mobile_aab" 1000004
-verify_bundle_manifest wear "$wear_aab" 2000004
+verify_bundle_manifest mobile "$mobile_aab" 1000005
+verify_bundle_manifest wear "$wear_aab" 2000005
 
 for aab in "$mobile_aab" "$wear_aab"; do
     printf 'Verified artifact: %s sha256=%s bytes=%s upload-cert-sha256=%s\n' \
