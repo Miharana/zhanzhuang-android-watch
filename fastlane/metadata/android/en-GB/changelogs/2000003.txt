@@ -1,0 +1,1 @@
+Watch-started sessions now appear on the paired phone immediately, with timer ownership established before live countdown updates. Includes the 0.1.1 launch, notification, consecutive-session and visual refinements.

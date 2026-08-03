@@ -191,7 +191,9 @@ class WearSessionService : Service() {
         if (force) runtimePublishJob?.cancel()
         runtimePublishJob = serviceScope.launch {
             try {
-                app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext).publishRuntime(runtime)
+                val sync = app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext)
+                if (force) sync.publishState(record)
+                sync.publishRuntime(runtime)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
