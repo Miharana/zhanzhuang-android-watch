@@ -115,9 +115,15 @@ Both candidates were uploaded on 2026-08-03 UTC. Android Publisher readback
 returned `0.1.3|completed|1000004` for `internal` and
 `0.1.3|completed|2000004` for `wear:internal`. Production remained
 `0.1.0|completed|1000001` and `0.1.0|completed|2000001`. The Play listing icon
-was uploaded with the phone internal release. Physical launcher and paired
-runtime evidence remains separate because the Mac did not enumerate either
-device through ADB after the upload.
+was uploaded with the phone internal release. An Android Publisher
+`edits.images.list` readback returned one icon for each of `en-GB`, `en-US`,
+and `zh-CN`; all three remote objects report SHA-256
+`82502746c4ff9bd2e967711aa1e0e8e58aba180958a4f6b2a45b9af12c58beb2`,
+exactly matching the three repository PNGs. The public unreviewed detail page
+still rendered Google's generic Android placeholder, so that cached surface is
+not used as icon-upload evidence. Physical launcher and paired runtime evidence
+remains separate because the Mac did not enumerate either device through ADB
+after the upload.
 
 ## Google Play remote state
 

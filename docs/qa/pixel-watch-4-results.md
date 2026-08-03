@@ -35,10 +35,12 @@ Play delivery is **ready for physical testing**. The phone and Wear OS internal
 tracks are active with version `0.1.3` (`1000004` / `2000004`); the shared tester list is enabled on
 both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
-Pro. The remote-install confirmation is waiting for the account holder's Google
-Passkey verification. No runtime, Health Connect, Data Layer, timing, haptic, or
-recovery result is inferred from track activation or device recognition, so the
-physical-device rows above remain `Not run` or `Blocked` until observed.
+Pro. After the 0.1.3 upload, the install picker again selected Pixel Watch 4 and
+accepted the Install action, then redirected to the account holder's Google
+Passkey verification. The browser is intentionally left at that verification
+page. No runtime, Health Connect, Data Layer, timing, haptic, or recovery result
+is inferred from track activation or device recognition, so the physical-device
+rows above remain `Not run` or `Blocked` until observed.
 
 ## Current physical connectivity boundary
 
