@@ -31,9 +31,10 @@ A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear in
 
 ## Play-delivered build status
 
-Play delivery is **ready for physical testing**. The phone and Wear OS internal
-tracks are active with version `0.1.4` (`1000005` / `2000005`); the shared tester list is enabled on
-both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
+Play delivery is **ready for physical testing**. The phone internal track is
+active with `0.1.4` (`1000005`), and the Wear OS internal track is active with
+the rejection-corrected `0.1.5` (`2000006`); the shared tester list is enabled
+on both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. After the 0.1.3 upload, the install picker selected Pixel Watch 4 and
 accepted the Install action. The account holder completed Google Passkey
@@ -44,10 +45,10 @@ completed that Google Passkey challenge, and Play returned the same explicit
 install-soon confirmation for the phone. No installed version, launcher
 appearance, runtime, Health Connect, Data Layer, timing, haptic, or recovery
 result is inferred from either remote request, so the physical-device rows
-above remain `Not run` or `Blocked` until observed. Version `0.1.4` is also on
-both production tracks with `completed` rollout status and is grouped under
-**Changes in review** in Play Console; this review state does not substitute
-for physical launcher or runtime evidence.
+above remain `Not run` or `Blocked` until observed. Phone `0.1.4` and Wear
+`0.1.5` are on their respective production tracks with `completed` rollout
+status and are grouped under **Changes in review** in Play Console; this review
+state does not substitute for physical launcher or runtime evidence.
 
 ## Current physical connectivity boundary
 

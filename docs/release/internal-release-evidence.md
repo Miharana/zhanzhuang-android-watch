@@ -1,6 +1,6 @@
 # Google Play release evidence
 
-Last updated: 2026-08-03 (UTC)
+Last updated: 2026-08-04 (UTC)
 
 ## Current production review identity
 
@@ -8,21 +8,22 @@ Last updated: 2026-08-03 (UTC)
 - Developer ID: `7258731265136907307`
 - Play app ID: `4973495334373549508`
 - Package: `app.zhanzhuang.timer`
-- Version name: `0.1.4`
+- Version names: phone/tablet `0.1.4`; Wear OS `0.1.5`
 - Upload certificate SHA-256:
   `83:FC:DF:02:8E:8B:E3:82:6C:AD:A6:86:76:08:A6:95:9C:77:5F:CA:D6:98:E7:13:FE:02:7A:07:0E:12:7C:81`
 
 | Surface | Version code | Candidate | SHA-256 |
 | --- | ---: | --- | --- |
 | Phones/tablets | `1000005` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `c424765c60c9382803d3503bcfffb49f14aaf3cc14194b9eab7f52ce6ed885cd` |
-| Wear OS | `2000005` | `wear/build/outputs/bundle/release/wear-release.aab` | `80ed4c351acd54e00c3d82f69c0001cc1629773a47567e7ad7f684c00a7e5c7d` |
+| Wear OS | `2000006` | `wear/build/outputs/bundle/release/wear-release.aab` | `56f8b10faceb3bddeea9ecb5ebb6cf396abaebcd5f91640ce4b91f1788e9f1b2` |
 
 The immutable candidates passed unit tests, mobile and Wear release lint,
 release bundle builds, JAR signature verification, upload-certificate matching,
 bundle manifest inspection, package/version checks, target SDK 36 checks, and
 the no-Internet/no-location release contract. Android Publisher reports both
-production tracks as `0.1.4` / `completed`, while Play Console groups both
-full-rollout changes under **Changes in review**.
+phone tracks as `0.1.4` / `completed` and both Wear tracks as `0.1.5` /
+`completed`. Play Console groups the corrected Wear release and the retained
+first-release changes under **Changes in review**.
 
 ## 0.1.1 internal release
 
@@ -164,6 +165,46 @@ Google's quick automated checks were running with an estimate of up to 13
 minutes; the page states that the changes will proceed to review automatically
 after those checks pass. There was no remaining send-for-review action.
 
+## 0.1.5 Wear rejection correction and resubmission
+
+Source commit: `549783c`
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Wear OS | `2000006` | `wear/build/outputs/bundle/release/wear-release.aab` | `10209517` | `56f8b10faceb3bddeea9ecb5ebb6cf396abaebcd5f91640ce4b91f1788e9f1b2` |
+
+Google Play rejected Wear version code `2000005` on 2026-08-04 for two
+directly evidenced quality issues: scrollable views lacked a scrollbar, and
+duration shortcut controls/text were cut by the round display edge. The
+rejection affected Wear only; the phone bundle was not named. The response did
+not appeal the correct finding.
+
+The setup and heart-rate permission pages now use Wear Compose's
+shape-adaptive `ScalingLazyColumn`, snap scrolling for touch and rotary input,
+round-safe horizontal action insets, and a platform `ScrollIndicator`. Other
+legacy `ScreenColumn` users also receive the platform scroll indicator. New
+source contracts were observed failing before implementation and passing after
+the fix. Visual verification on a 456 px round Wear OS 4/API 33 emulator showed
+the active shortcut fully inside the circle, adjacent items scaling/fading at
+the edges, and the scroll indicator visible. The connected Wear instrumentation
+suite then passed all five tests, including the real service session flow.
+
+The clean-free gate passed 188 Gradle tasks across unit tests, debug lint,
+debug builds, release manifests, permissions, locales, and distinct phone/Wear
+version identities. The signed verifier passed the release test/lint/bundle
+pipeline, strict JAR integrity, upload-certificate matching, package and SDK
+inspection, and the no-Internet/no-location contracts. The approved upload
+certificate remained unchanged.
+
+The Wear AAB was uploaded to `wear:internal` and promoted to
+`wear:production` with `deactivate_on_promote=true`. Sequential Android
+Publisher readback returned `0.1.5|completed|2000006` on both Wear tracks;
+`2000005` was no longer active. Phone tracks remained unchanged at
+`0.1.4|completed|1000005`. Play Console then showed Wear `0.1.5` under the 15
+pending first-release changes. The final confirmation returned **15 changes
+sent for review**, and the Publishing overview moved to **Changes in review**
+with one visible `0.1.5` entry.
+
 ## Google Play remote state
 
 The established Miharana Fastlane service account was granted only the app-
@@ -173,9 +214,9 @@ and production releases. It has no account administration or finance access.
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
 | Phones/tablets | `internal` | `1000005` | `0.1.4` / `completed` / Active |
-| Wear OS | `wear:internal` | `2000005` | `0.1.4` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000006` | `0.1.5` / `completed` / Active |
 | Phones/tablets | `production` | `1000005` | `0.1.4` / `completed`; listed under Changes in review |
-| Wear OS | `wear:production` | `2000005` | `0.1.4` / `completed`; listed under Changes in review |
+| Wear OS | `wear:production` | `2000006` | `0.1.5` / `completed`; listed under Changes in review |
 
 The first production promotions were deliberately created as `draft`, because
 Google Play rejects a non-draft production release while the app itself is
