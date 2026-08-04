@@ -13,3 +13,4 @@ service-account*.json
 .idea/
 *.iml
 .worktrees/
+fastlane/report.xml

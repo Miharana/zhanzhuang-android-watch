@@ -12,12 +12,12 @@ Last updated: 2026-08-04 (UTC)
 - Upload certificate SHA-256:
   `83:FC:DF:02:8E:8B:E3:82:6C:AD:A6:86:76:08:A6:95:9C:77:5F:CA:D6:98:E7:13:FE:02:7A:07:0E:12:7C:81`
 
-| Surface | Version code | Candidate | SHA-256 |
+| Surface | Version code | Uploaded artifact path | SHA-256 at Play commit |
 | --- | ---: | --- | --- |
 | Phones/tablets | `1000005` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `c424765c60c9382803d3503bcfffb49f14aaf3cc14194b9eab7f52ce6ed885cd` |
 | Wear OS | `2000006` | `wear/build/outputs/bundle/release/wear-release.aab` | `56f8b10faceb3bddeea9ecb5ebb6cf396abaebcd5f91640ce4b91f1788e9f1b2` |
 
-The immutable candidates passed unit tests, mobile and Wear release lint,
+The uploaded candidates passed unit tests, mobile and Wear release lint,
 release bundle builds, JAR signature verification, upload-certificate matching,
 bundle manifest inspection, package/version checks, target SDK 36 checks, and
 the no-Internet/no-location release contract. Android Publisher reports both
@@ -169,7 +169,7 @@ after those checks pass. There was no remaining send-for-review action.
 
 Source commit: `549783c`
 
-| Surface | Version code | Candidate | Bytes | SHA-256 |
+| Surface | Version code | Uploaded artifact path | Bytes at Play commit | SHA-256 at Play commit |
 | --- | ---: | --- | ---: | --- |
 | Wear OS | `2000006` | `wear/build/outputs/bundle/release/wear-release.aab` | `10209517` | `56f8b10faceb3bddeea9ecb5ebb6cf396abaebcd5f91640ce4b91f1788e9f1b2` |
 
@@ -204,6 +204,13 @@ Publisher readback returned `0.1.5|completed|2000006` on both Wear tracks;
 pending first-release changes. The final confirmation returned **15 changes
 sent for review**, and the Publishing overview moved to **Changes in review**
 with one visible `0.1.5` entry.
+
+The hashes above identify the exact bytes committed to Google Play. A later
+post-submission verification rebuild included newer archive/VCS metadata and
+therefore produced different local file hashes (`c4f21c4c…e3e7` for mobile and
+`4fe35bb2…ef51` for Wear), while all manifest, version, certificate, signature,
+SDK, permission, test, and lint checks passed again. Those rebuilt files were
+not uploaded and do not replace the Play-commit hashes above.
 
 ## Google Play remote state
 
