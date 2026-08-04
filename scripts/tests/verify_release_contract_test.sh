@@ -34,8 +34,11 @@ require_text "$verifier" 'phoneScreenshots'
 require_text "$verifier" 'wearScreenshots'
 require_text "$verifier" 'featureGraphic.png'
 require_text "$verifier" '0.1.4'
+require_text "$verifier" '0.1.5'
 require_text "$verifier" '1000005'
-require_text "$verifier" '2000005'
+require_text "$verifier" '2000006'
+require_text "$verifier" 'verify_bundle_manifest mobile "$mobile_aab" 1000005 0.1.4'
+require_text "$verifier" 'verify_bundle_manifest wear "$wear_aab" 2000006 0.1.5'
 require_text "$verifier" 'track_promote_release_status: "completed"'
 require_text "$verifier" 'app.zhanzhuang.timer'
 require_text "$verifier" '"$height" -le $((2 * width))'
@@ -100,6 +103,7 @@ for module in mobile wear; do
     require_text "$repo_root/$module/build.gradle.kts" 'signingConfigs'
     require_text "$repo_root/$module/build.gradle.kts" 'signingConfig = signingConfigs.getByName("release")'
 done
+require_text "$repo_root/fastlane/Fastfile" 'version_code: 2_000_006'
 
 set +e
 env -u ZHANZHUANG_KEYSTORE_PATH -u ZHANZHUANG_KEY_ALIAS -u ZHANZHUANG_STORE_PASSWORD -u ZHANZHUANG_KEY_PASSWORD \

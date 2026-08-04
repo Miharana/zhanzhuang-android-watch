@@ -18,10 +18,35 @@ class WearStoreScreenContractTest {
         assertFalse(setup.contains("R.string.standing_meditation"))
     }
 
-    @Test fun permissionContentUsesRoundScreenSafeTopAndButtonSpacing() {
+    @Test fun permissionContentUsesTheWearShapeAdaptiveList() {
         val permission = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/PermissionScreen.kt").readText()
-        assertTrue(permission.contains("ScreenColumn(verticalSpacing = 4.dp)"))
-        assertTrue(permission.contains("Spacer(Modifier.height(36.dp))"))
+        assertTrue(permission.contains("rememberScalingLazyListState("))
+        assertTrue(permission.contains("ScalingLazyColumn("))
+        assertTrue(permission.contains("ScalingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
+        assertTrue(permission.contains("ScrollIndicator(state = scroll"))
+        assertFalse(permission.contains("ScreenColumn("))
+    }
+
+    @Test fun everyScrollableWearScreenShowsAPlatformScrollIndicator() {
+        val screenParts = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/WearScreenParts.kt").readText()
+        assertTrue(screenParts.contains("ScrollIndicator("))
+        assertTrue(screenParts.contains("state = scrollState"))
+        assertTrue(screenParts.contains("Modifier.align(Alignment.CenterEnd)"))
+    }
+
+    @Test fun durationShortcutsStayInsideTheRoundScreen() {
+        val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
+        assertTrue(setup.contains("modifier = Modifier.padding(horizontal = RoundActionHorizontalInset, vertical = 2.dp)"))
+    }
+
+    @Test fun setupUsesTheWearShapeAdaptiveListWithSnapAndItsOwnIndicator() {
+        val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
+        assertTrue(setup.contains("rememberScalingLazyListState("))
+        assertTrue(setup.contains("ScalingLazyColumn("))
+        assertTrue(setup.contains("ScalingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
+        assertTrue(setup.contains("RotaryScrollableDefaults.snapBehavior(scrollableState = scroll)"))
+        assertTrue(setup.contains("ScrollIndicator(state = scroll"))
+        assertFalse(setup.contains("ScreenColumn("))
     }
 
     @Test fun roundSafeActionBoundsFitInsideThe454pxWatchCircle() {

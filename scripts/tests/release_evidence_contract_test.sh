@@ -29,9 +29,10 @@ require_text "$checks" 'resolve_java_home'
 require_text "$checks" 'export ANDROID_HOME='
 require_text "$checks" 'app.zhanzhuang.timer.debug'
 require_text "$checks" 'versionName'
-require_text "$checks" "versionName='0.1.4'"
 require_text "$checks" '1000005'
-require_text "$checks" '2000005'
+require_text "$checks" '2000006'
+require_text "$checks" 'inspect_apk mobile "$mobile_apk" 28 1000005 0.1.4'
+require_text "$checks" 'inspect_apk wear "$wear_apk" 33 2000006 0.1.5'
 require_text "$checks" "sdkVersion:'"
 require_text "$checks" "targetSdkVersion:'"
 require_text "$checks" "compileSdkVersion='36'"

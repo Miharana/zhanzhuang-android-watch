@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScrollIndicator
 
 internal val RoundScreenHorizontalPadding = 18.dp
 internal val RoundActionHorizontalInset = 32.dp
@@ -71,16 +72,22 @@ internal fun ScreenColumn(
     verticalSpacing: androidx.compose.ui.unit.Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight()
-            .verticalScroll(scrollState)
-            .padding(RoundScreenPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-        content = content,
-    )
+    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .verticalScroll(scrollState)
+                .padding(RoundScreenPadding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+            content = content,
+        )
+        ScrollIndicator(
+            state = scrollState,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
+    }
 }
 
 @Composable
