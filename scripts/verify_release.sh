@@ -42,7 +42,7 @@ raw_signing=$(git grep -nE 'ZHANZHUANG_(STORE|KEY)_PASSWORD[[:space:]]*=[^[:spac
 
 for locale in en-GB en-US zh-CN; do
     locale_dir="fastlane/metadata/android/$locale"
-    for metadata in title.txt short_description.txt full_description.txt changelogs/1000005.txt changelogs/2000006.txt; do
+    for metadata in title.txt short_description.txt full_description.txt changelogs/1000006.txt changelogs/2000007.txt; do
         require_file "$locale_dir/$metadata"
     done
     [[ $(wc -m < "$locale_dir/title.txt") -le 30 ]] || fail "$locale title exceeds 30 characters"
@@ -75,6 +75,7 @@ for locale in en-GB en-US zh-CN; do
 done
 
 require_text fastlane/Fastfile 'upload_mobile_internal'
+require_text fastlane/Fastfile 'upload_mobile_internal_binary_only'
 require_text fastlane/Fastfile 'publish_metadata'
 require_text fastlane/Fastfile 'app.zhanzhuang.timer'
 require_text fastlane/Fastfile 'upload_wear_internal'
@@ -143,8 +144,8 @@ verify_bundle_manifest() {
         [[ "$manifest" != *'android.hardware.type.watch'* ]] || fail 'mobile AAB must not require watch hardware'
     fi
 }
-verify_bundle_manifest mobile "$mobile_aab" 1000005 0.1.4
-verify_bundle_manifest wear "$wear_aab" 2000006 0.1.5
+verify_bundle_manifest mobile "$mobile_aab" 1000006 0.1.6
+verify_bundle_manifest wear "$wear_aab" 2000007 0.1.6
 
 for aab in "$mobile_aab" "$wear_aab"; do
     printf 'Verified artifact: %s sha256=%s bytes=%s upload-cert-sha256=%s\n' \

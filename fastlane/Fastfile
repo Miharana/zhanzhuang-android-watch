@@ -35,6 +35,21 @@ platform :android do
     )
   end
 
+  desc "Upload only the verified mobile AAB to internal testing"
+  lane :upload_mobile_internal_binary_only do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      aab: "mobile/build/outputs/bundle/release/mobile-release.aab",
+      track: "internal",
+      release_status: "completed",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
+    )
+  end
+
   desc "Upload the verified Wear AAB to the confirmed Wear OS internal track"
   lane :upload_wear_internal do
     upload_to_play_store(
@@ -46,7 +61,8 @@ platform :android do
       release_status: "completed",
       skip_upload_metadata: true,
       skip_upload_images: true,
-      skip_upload_screenshots: true
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
     )
   end
 
