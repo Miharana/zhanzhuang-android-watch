@@ -1,10 +1,11 @@
 # Pixel Watch 4 physical QA results
 
-Date: 2026-08-03
+Last updated: 2026-08-06
 
-Physical Pixel Watch 4 evidence for `0.1.1` is **not run**: `adb devices -l`
-returned no attached devices during this build. Nothing below is a pass
-inferred from emulator, unit tests, or local build output.
+Physical Pixel Watch 4 evidence for the current `0.1.6` internal build is
+**not run**. On 2026-08-06, `adb devices -l` returned only the local Android
+emulator and no authorized phone or watch. Nothing below is a pass inferred
+from emulator, unit tests, or local build output.
 
 | Scenario | Expected observation | Observed result | Status |
 | --- | --- | --- | --- |
@@ -32,8 +33,8 @@ A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear in
 ## Play-delivered build status
 
 Play delivery is **ready for physical testing**. The phone internal track is
-active with `0.1.4` (`1000005`), and the Wear OS internal track is active with
-the rejection-corrected `0.1.5` (`2000006`); the shared tester list is enabled
+active with `0.1.6` (`1000006`), and the Wear OS internal track is active with
+`0.1.6` (`2000007`); the shared tester list is enabled
 on both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. After the 0.1.3 upload, the install picker selected Pixel Watch 4 and

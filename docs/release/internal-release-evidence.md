@@ -20,6 +20,36 @@ binary-only phone internal lane, matching the existing metadata-skipping Wear
 lane, so testing the launcher does not alter the current production-review
 listing or its remote icon.
 
+## 0.1.6 two-circle launcher internal release
+
+Source commit: `a20416c66307a61a9915e58ddc4a49b790ba8fba`
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000006` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10715443` | `f50ba7964199bed2e5d2f2d8fa3e6151a38eb6e536fa2eede3b69cd72b4724d0` |
+| Wear OS | `2000007` | `wear/build/outputs/bundle/release/wear-release.aab` | `10208949` | `9a14c438921cf2f29090709f436e1e4369101ffc60687ab3dc532d94fb05f0ea` |
+
+The launcher now keeps the gold outer rim and uses only a hollow gold head
+circle, one larger gold-and-soil taiji circle, and two parallel legs. Phone,
+Wear, monochrome, the canonical SVG, and all local listing icons share that
+geometry; there are no arms, torso line, sparkles, or split stance.
+
+The no-clean Android quality gate and the signed release verifier passed on
+2026-08-06. They cover both app test suites, debug and release lint, debug APK
+builds, signed AAB builds, strict JAR integrity, the approved upload
+certificate, bundle manifests, SDK/package/version identity, localized assets,
+and the no-Internet/no-location contract. The verifier also confirms the exact
+candidate hashes above.
+
+Both signed AABs were uploaded only to their existing Internal testing tracks.
+The phone lane skips store metadata, images, screenshots, and changelogs; the
+Wear lane skips the same listing data. Sequential Android Publisher readback
+after upload returned `0.1.6|completed|1000006` for `internal` and
+`0.1.6|completed|2000007` for `wear:internal`. `production` remained
+`0.1.4|completed|1000005`; `wear:production` remained
+`0.1.5|completed|2000006`. The production-review listing and remote icon were
+not modified by this release.
+
 ## Current production review identity
 
 - Developer: **Urticad Tech Ltd** (organisation account)
@@ -238,8 +268,8 @@ and production releases. It has no account administration or finance access.
 
 | Surface | Track | Version code | Android Publisher readback after submission |
 | --- | --- | ---: | --- |
-| Phones/tablets | `internal` | `1000005` | `0.1.4` / `completed` / Active |
-| Wear OS | `wear:internal` | `2000006` | `0.1.5` / `completed` / Active |
+| Phones/tablets | `internal` | `1000006` | `0.1.6` / `completed` / Active |
+| Wear OS | `wear:internal` | `2000007` | `0.1.6` / `completed` / Active |
 | Phones/tablets | `production` | `1000005` | `0.1.4` / `completed`; listed under Changes in review |
 | Wear OS | `wear:production` | `2000006` | `0.1.5` / `completed`; listed under Changes in review |
 
