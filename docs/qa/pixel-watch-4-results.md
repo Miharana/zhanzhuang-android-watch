@@ -30,6 +30,11 @@ from emulator, unit tests, or local build output.
 
 A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear instrumentation suite successfully: 5 tests passed. The check covers Compose setup/active/end-confirmation contracts and is recorded in `wear-device-matrix.md`. It does **not** prove physical haptics, heart rate, foreground longevity, screen-off timing, reboot/process recovery, paired Data Layer delivery, or Pixel Watch 4 behavior.
 
+On 2026-08-06, the available phone emulator (Android 17/API 37) ran all six
+mobile instrumentation tests for the 0.1.6 source successfully. This checks
+the phone debug variant only and does not prove the Play-signed build, physical
+launcher icon, companion delivery, or any watch behaviour.
+
 ## Play-delivered build status
 
 Play delivery is **ready for physical testing**. The phone internal track is

@@ -41,6 +41,11 @@ certificate, bundle manifests, SDK/package/version identity, localized assets,
 and the no-Internet/no-location contract. The verifier also confirms the exact
 candidate hashes above.
 
+After the upload, a local Android 17/API 37 phone emulator ran all six mobile
+instrumentation tests successfully against the debug variant. That is
+supplementary phone-flow evidence only; it neither installs the Play-signed AAB
+nor substitutes for a physical Pixel Watch 4 check.
+
 Both signed AABs were uploaded only to their existing Internal testing tracks.
 The phone lane skips store metadata, images, screenshots, and changelogs; the
 Wear lane skips the same listing data. Sequential Android Publisher readback
