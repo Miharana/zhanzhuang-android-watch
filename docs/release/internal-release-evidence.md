@@ -1,6 +1,24 @@
 # Google Play release evidence
 
-Last updated: 2026-08-04 (UTC)
+Last updated: 2026-08-06 (UTC)
+
+## 0.1.6 two-circle launcher pre-change Android audit
+
+Before the approved icon-only change, the current Android router guidance and
+project source were reviewed. The project remains a two-module native Android
+app using Java 17 with `compileSdk`/`targetSdk` 36; no dependency, AGP, or
+migration change is required for this release. Phone and Wear manifests both
+resolve `android:icon` and `android:roundIcon` through `@mipmap/ic_launcher`.
+The existing no-clean Android gate passed on 2026-08-06, covering JVM tests,
+debug lint, debug APK builds, release manifests, localized resources, launcher
+resource presence, special-use/health foreground-service declarations, and the
+no-Internet/no-location contract.
+
+The audit found one release-isolation concern: `upload_mobile_internal` also
+uploads listing metadata and images. The 0.1.6 test release will add and use a
+binary-only phone internal lane, matching the existing metadata-skipping Wear
+lane, so testing the launcher does not alter the current production-review
+listing or its remote icon.
 
 ## Current production review identity
 
