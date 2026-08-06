@@ -100,8 +100,8 @@ Require SVG ids `two-circle-standing-figure`, `head-ring`, `standing-taiji`, `le
 - [ ] **Step 2: Verify the assertions fail on the old asset.**
 
 ```bash
-./gradlew :mobile:test --tests app.zhanzhuang.timer.mobile.ui.ResourceIdentityContractTest
-./gradlew :wear:test --tests app.zhanzhuang.timer.wear.ResourceIdentityContractTest
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools ./gradlew :mobile:testDebugUnitTest --tests app.zhanzhuang.timer.mobile.ui.ResourceIdentityContractTest
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools ./gradlew :wear:testDebugUnitTest --tests app.zhanzhuang.timer.wear.ResourceIdentityContractTest
 ```
 
 Expected: both fail because old resources still contain arms, sparkle, and splayed legs.
@@ -171,8 +171,8 @@ Expected: three identical 512×512 RGBA files. Replace the icon line in `ALT_TEX
 - [ ] **Step 4: Verify GREEN and commit.**
 
 ```bash
-./gradlew :mobile:test --tests app.zhanzhuang.timer.mobile.ui.ResourceIdentityContractTest
-./gradlew :wear:test --tests app.zhanzhuang.timer.wear.ResourceIdentityContractTest
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools ./gradlew :mobile:testDebugUnitTest --tests app.zhanzhuang.timer.mobile.ui.ResourceIdentityContractTest
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools ./gradlew :wear:testDebugUnitTest --tests app.zhanzhuang.timer.wear.ResourceIdentityContractTest
 bash scripts/tests/verify_release_contract_test.sh
 git add fastlane/assets-source mobile/src/main/res/drawable wear/src/main/res/drawable fastlane/metadata/android/en-GB/images/icon.png fastlane/metadata/android/en-US/images/icon.png fastlane/metadata/android/zh-CN/images/icon.png
 git commit -m "feat: simplify launcher to two-circle standing icon"
