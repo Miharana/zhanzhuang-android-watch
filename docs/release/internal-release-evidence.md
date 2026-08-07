@@ -33,6 +33,14 @@ lint, manifest identity and form-factor checks, forbidden-permission checks,
 strict archive integrity verification, and the approved upload-certificate
 fingerprint check.
 
+Android Publisher readback after upload and promotion returned
+`wear:internal|0.1.7|completed|2000008` and
+`wear:production|0.1.7|completed|2000008`. On 2026-08-07, Play Console then
+confirmed **15 changes sent for review**, including the production Wear `0.1.7`
+full rollout. Its automatic quick checks remained in progress at submission;
+Google sends the changes to review as soon as those checks complete
+successfully.
+
 ## 0.1.6 two-circle launcher pre-change Android audit
 
 Before the approved icon-only change, the current Android router guidance and
