@@ -1,6 +1,37 @@
 # Google Play release evidence
 
-Last updated: 2026-08-06 (UTC)
+Last updated: 2026-08-07 (UTC)
+
+## 0.1.7 Wear round-screen policy correction
+
+Google Play's 2026-08-07 policy notice for Wear version `2000006` identified
+the **Watch shapes** requirement. Its reviewer screenshots showed a clipped
+setup control and a clipped end-confirmation action on a round display.
+
+Wear `0.1.7` uses version code `2000008` and replaces the affected round-screen
+paths with Material 3 `AppScaffold` / `ScreenScaffold` and
+`TransformingLazyColumn`: setup, optional heart-rate permission, active
+session, end confirmation, and completion. All custom actions use the shared
+round-safe horizontal inset plus Material 3 surface transformation and minimum
+vertical list padding. The old rectangular `ScreenColumn` implementation was
+removed so no user-reachable Wear screen can fall back to it.
+
+On the 454px round Wear OS 4 emulator (API 33), final screenshots showed the
+setup controls, active-session controls, and all three end-confirmation actions
+fully visible. The four direct Wear UI instrumentation interactions passed.
+This is emulator evidence, not a claim of physical Pixel Watch 4 completion.
+
+The phone binary remains `0.1.6` / `1000006`; only `wear:internal` and
+`wear:production` are to be replaced by `0.1.7` / `2000008`.
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Wear OS | `2000008` | `wear/build/outputs/bundle/release/wear-release.aab` | `10214542` | `30ea8dad5e0cc6558195391f944c269ad187fc49433bb47928aa247f10ddf77b` |
+
+The signed candidate passed the local release verifier: JVM tests, release
+lint, manifest identity and form-factor checks, forbidden-permission checks,
+strict archive integrity verification, and the approved upload-certificate
+fingerprint check.
 
 ## 0.1.6 two-circle launcher pre-change Android audit
 

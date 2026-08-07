@@ -20,40 +20,77 @@ class WearStoreScreenContractTest {
 
     @Test fun permissionContentUsesTheWearShapeAdaptiveList() {
         val permission = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/PermissionScreen.kt").readText()
-        assertTrue(permission.contains("rememberScalingLazyListState("))
-        assertTrue(permission.contains("ScalingLazyColumn("))
-        assertTrue(permission.contains("ScalingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
-        assertTrue(permission.contains("ScrollIndicator(state = scroll"))
+        assertTrue(permission.contains("rememberTransformingLazyColumnState("))
+        assertTrue(permission.contains("TransformingLazyColumn("))
+        assertTrue(permission.contains("TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
+        assertTrue(permission.contains("ScreenScaffold(scrollState = scroll"))
+        assertTrue(permission.contains("RotaryScrollableDefaults.snapBehavior(scrollableState = scroll)"))
         assertFalse(permission.contains("ScreenColumn("))
     }
 
-    @Test fun everyScrollableWearScreenShowsAPlatformScrollIndicator() {
+    @Test fun sharedWearScreenPartsDoNotKeepTheLegacyRectangularScroller() {
         val screenParts = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/WearScreenParts.kt").readText()
-        assertTrue(screenParts.contains("ScrollIndicator("))
-        assertTrue(screenParts.contains("state = scrollState"))
-        assertTrue(screenParts.contains("Modifier.align(Alignment.CenterEnd)"))
+        assertFalse(screenParts.contains("fun ScreenColumn("))
+        assertFalse(screenParts.contains("verticalScroll("))
+    }
+
+    @Test fun completionUsesTheRoundSafeTransformingList() {
+        val completion = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/CompletionScreen.kt").readText()
+        assertTrue(completion.contains("rememberTransformingLazyColumnState("))
+        assertTrue(completion.contains("TransformingLazyColumn("))
+        assertTrue(completion.contains("ScreenScaffold(scrollState = scroll"))
+        assertFalse(completion.contains("ScreenColumn("))
+    }
+
+    @Test fun wearAppUsesTheMaterial3AppScaffold() {
+        val activity = File("src/main/kotlin/app/zhanzhuang/timer/wear/MainActivity.kt").readText()
+        assertTrue(activity.contains("AppScaffold {"))
     }
 
     @Test fun durationShortcutsStayInsideTheRoundScreen() {
         val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
-        assertTrue(setup.contains("modifier = Modifier.padding(horizontal = RoundActionHorizontalInset, vertical = 2.dp)"))
+        assertTrue(setup.contains("RoundActionHorizontalInset, vertical = 2.dp"))
+        assertTrue(setup.contains("minimumVerticalContentPadding("))
     }
 
     @Test fun setupUsesTheWearShapeAdaptiveListWithSnapAndItsOwnIndicator() {
         val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
-        assertTrue(setup.contains("rememberScalingLazyListState("))
-        assertTrue(setup.contains("ScalingLazyColumn("))
-        assertTrue(setup.contains("ScalingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
+        assertTrue(setup.contains("rememberTransformingLazyColumnState("))
+        assertTrue(setup.contains("TransformingLazyColumn("))
+        assertTrue(setup.contains("TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll)"))
         assertTrue(setup.contains("RotaryScrollableDefaults.snapBehavior(scrollableState = scroll)"))
-        assertTrue(setup.contains("ScrollIndicator(state = scroll"))
+        assertTrue(setup.contains("ScreenScaffold(scrollState = scroll"))
         assertFalse(setup.contains("ScreenColumn("))
+    }
+
+    @Test fun reviewedSetupAndEndConfirmationUseRoundSafeTransformingLists() {
+        val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
+        val active = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/ActiveSessionScreen.kt").readText()
+
+        assertTrue(setup.contains("TransformingLazyColumn("))
+        assertTrue(setup.contains("RoundStepperHorizontalInset"))
+        assertTrue(setup.contains("minimumVerticalContentPadding("))
+        assertTrue(setup.contains("applyContentTransformation()"))
+        assertTrue(active.contains("rememberTransformingLazyColumnState("))
+        assertTrue(active.contains("TransformingLazyColumn("))
+        assertTrue(active.contains("applyContentTransformation()"))
+        val confirmation = active.substringAfter("private fun EndSessionConfirmation")
+        assertTrue(confirmation.contains("TransformingLazyColumn("))
+        assertFalse(confirmation.contains("AlertDialog("))
+        assertFalse(confirmation.contains("ScreenColumn"))
+    }
+
+    @Test fun setupKeepsShortcutHeadingBelowTheInitialRoundSafeViewport() {
+        val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
+
+        assertTrue(setup.contains("RoundShortcutTopSafeSpace"))
     }
 
     @Test fun roundSafeActionBoundsFitInsideThe454pxWatchCircle() {
         val safeAction = RoundScreenGeometry.actionBounds(
             diameterPx = 454,
             density = 2f,
-            topPx = 319,
+            topPx = 323,
         )
         assertTrue(RoundScreenGeometry.rectFitsCircle(safeAction, diameterPx = 454))
 

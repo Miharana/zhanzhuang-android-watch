@@ -1,6 +1,6 @@
 # Pixel Watch 4 physical QA results
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 Physical Pixel Watch 4 evidence for the current `0.1.6` internal build is
 **not run**. On 2026-08-06, `adb devices -l` returned only the local Android
@@ -27,6 +27,16 @@ from emulator, unit tests, or local build output.
 | Battery saver | Timer behavior is observed and documented without a reliability claim | Not run | Blocked |
 
 ## Non-substituting emulator evidence
+
+On 2026-08-07, the 454px round Wear OS 4 emulator (Android 13/API 33) ran the
+four `WearScreensTest` UI interactions directly through its installed test
+APK: setup defaults, the end-confirmation requirement, confirmed cancellation,
+and cancelled-session semantics all passed. Separate final screenshots of the
+setup, active-session, and end-confirmation surfaces show every visible action
+fully inside the round screen: duration/interval controls and Start session;
+Pause and End session; and End session, Cancel session, and Keep standing.
+This validates the Wear `0.1.7` / `2000008` source layout correction only; it
+does not substitute for a physical Pixel Watch 4 test.
 
 A task-created round Wear OS 4 emulator (Android 13/API 33) executed the Wear instrumentation suite successfully: 5 tests passed. The check covers Compose setup/active/end-confirmation contracts and is recorded in `wear-device-matrix.md`. It does **not** prove physical haptics, heart rate, foreground longevity, screen-off timing, reboot/process recovery, paired Data Layer delivery, or Pixel Watch 4 behavior.
 

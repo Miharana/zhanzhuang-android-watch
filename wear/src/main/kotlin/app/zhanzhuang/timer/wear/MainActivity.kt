@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.content.ContextCompat
 import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.rememberAmbientModeManager
+import androidx.wear.compose.material3.AppScaffold
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
@@ -142,24 +143,26 @@ private fun WearApp(
         if (display.record?.status in setOf(SessionStatus.RUNNING, SessionStatus.COMPLETED)) sparkle = true
     }
 
-    when {
-        permissionPrompt -> PermissionScreen(onRequestPermission, onContinueWithoutHeartRate)
-        display.record?.status in setOf(SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.STARTING, SessionStatus.COMPLETING) -> {
-            ActiveSessionScreen(
-                state = display,
-                onPause = onPause,
-                onResume = onResume,
-                onFinish = onFinish,
-                onCancel = onCancel,
-                ambient = ambient,
-            )
+    AppScaffold {
+        when {
+            permissionPrompt -> PermissionScreen(onRequestPermission, onContinueWithoutHeartRate)
+            display.record?.status in setOf(SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.STARTING, SessionStatus.COMPLETING) -> {
+                ActiveSessionScreen(
+                    state = display,
+                    onPause = onPause,
+                    onResume = onResume,
+                    onFinish = onFinish,
+                    onCancel = onCancel,
+                    ambient = ambient,
+                )
+            }
+            display.record?.status in setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED) &&
+                display.record?.id != dismissedCompletionId ->
+                CompletionScreen(display, onDone = { dismissedCompletionId = display.record?.id })
+            else -> SetupScreen(config, { config = it }, { onStart(config) })
         }
-        display.record?.status in setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED) &&
-            display.record?.id != dismissedCompletionId ->
-            CompletionScreen(display, onDone = { dismissedCompletionId = display.record?.id })
-        else -> SetupScreen(config, { config = it }, { onStart(config) })
+        GoldSparkle(enabled = sparkle && motionAllowed, onFinished = { sparkle = false })
     }
-    GoldSparkle(enabled = sparkle && motionAllowed, onFinished = { sparkle = false })
 }
 
 private data class AmbientPresentation(

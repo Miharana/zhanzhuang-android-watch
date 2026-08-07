@@ -90,7 +90,7 @@ platform :android do
       track: "wear:internal",
       track_promote_to: "wear:production",
       track_promote_release_status: "completed",
-      version_code: 2_000_006,
+      version_code: 2_000_008,
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,

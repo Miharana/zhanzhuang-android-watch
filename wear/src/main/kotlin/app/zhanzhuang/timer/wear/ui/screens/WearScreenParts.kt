@@ -3,22 +3,15 @@ package app.zhanzhuang.timer.wear.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,12 +26,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScrollIndicator
 
 internal val RoundScreenHorizontalPadding = 18.dp
-internal val RoundActionHorizontalInset = 32.dp
+internal val RoundActionHorizontalInset = 41.dp
+internal val RoundStepperHorizontalInset = 28.dp
+internal val RoundShortcutTopSafeSpace = 32.dp
 internal val RoundActionBottomSafeSpace = 64.dp
-internal val RoundScreenPadding = PaddingValues(horizontal = RoundScreenHorizontalPadding, vertical = 16.dp)
 
 /** Geometry behind the 454px round Wear target used for release screenshots and interaction layout. */
 internal object RoundScreenGeometry {
@@ -63,30 +56,6 @@ internal object RoundScreenGeometry {
             val dy = y - center
             dx * dx + dy * dy <= radiusSquared
         }
-    }
-}
-
-@Composable
-internal fun ScreenColumn(
-    scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
-    verticalSpacing: androidx.compose.ui.unit.Dp = 8.dp,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .verticalScroll(scrollState)
-                .padding(RoundScreenPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-            content = content,
-        )
-        ScrollIndicator(
-            state = scrollState,
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
     }
 }
 

@@ -127,7 +127,7 @@ done
 expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService' and @*[local-name()='foregroundServiceType']='0x40000000']" 1 'mobile special-use service'
 expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService']/*[local-name()='property' and @*[local-name()='name']='android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE' and @*[local-name()='value']='standing_meditation_timer']" 1 'mobile special-use justification'
 
-wear_manifest=$(inspect_apk wear "$wear_apk" 33 2000007 0.1.6)
+wear_manifest=$(inspect_apk wear "$wear_apk" 33 2000008 0.1.7)
 expect_xml_count "$wear_manifest" "//*[local-name()='uses-feature' and @*[local-name()='name']='android.hardware.type.watch' and @*[local-name()='required']='true']" 1 'Wear watch form factor'
 expect_xml_count "$wear_manifest" "//*[local-name()='application']/*[local-name()='meta-data' and @*[local-name()='name']='com.google.android.wearable.standalone' and @*[local-name()='value']='true']" 1 'Wear standalone metadata'
 for permission in \
