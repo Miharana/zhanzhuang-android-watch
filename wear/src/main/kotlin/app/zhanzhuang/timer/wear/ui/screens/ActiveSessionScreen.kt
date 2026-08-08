@@ -13,10 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -34,6 +32,7 @@ import app.zhanzhuang.timer.model.SessionStatus
 import app.zhanzhuang.timer.wear.session.WearSessionUiState
 import app.zhanzhuang.timer.wear.ui.formatWearDuration
 import app.zhanzhuang.timer.wear.R
+import app.zhanzhuang.timer.wear.ui.components.EIntervalTimer
 
 @Composable
 fun ActiveSessionScreen(
@@ -61,10 +60,23 @@ fun ActiveSessionScreen(
         ) {
             item { Text(if (paused) stringResource(R.string.paused) else stringResource(R.string.standing), color = colors.primaryContainer) }
             item {
+                EIntervalTimer(
+                    activeElapsedMs = state.record?.let { record ->
+                        (record.config.durationMinutes * 60_000L - state.remainingMs).coerceAtLeast(0)
+                    } ?: 0L,
+                    config = state.record?.config ?: app.zhanzhuang.timer.model.SessionConfig(),
+                    description = remainingDescription,
+                    ambient = ambient,
+                    modifier = Modifier
+                        .padding(horizontal = RoundActionHorizontalInset)
+                        .transformedHeight(this, transformationSpec),
+                )
+            }
+            item {
             Text(
                 text = if (ambient) stringResource(R.string.minutes_value, (state.remainingMs + 59_999L) / 60_000L) else formatWearDuration(state.remainingMs),
                 color = colors.onBackground,
-                style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 30.sp, fontFeatureSettings = "tnum"),
+                style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace, fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { stateDescription = remainingDescription },
             )

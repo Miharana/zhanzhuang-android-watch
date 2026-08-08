@@ -42,7 +42,7 @@ raw_signing=$(git grep -nE 'ZHANZHUANG_(STORE|KEY)_PASSWORD[[:space:]]*=[^[:spac
 
 for locale in en-GB en-US zh-CN; do
     locale_dir="fastlane/metadata/android/$locale"
-    for metadata in title.txt short_description.txt full_description.txt changelogs/1000006.txt changelogs/2000008.txt; do
+    for metadata in title.txt short_description.txt full_description.txt changelogs/1000008.txt changelogs/2000009.txt; do
         require_file "$locale_dir/$metadata"
     done
     [[ $(wc -m < "$locale_dir/title.txt") -le 30 ]] || fail "$locale title exceeds 30 characters"
@@ -144,8 +144,8 @@ verify_bundle_manifest() {
         [[ "$manifest" != *'android.hardware.type.watch'* ]] || fail 'mobile AAB must not require watch hardware'
     fi
 }
-verify_bundle_manifest mobile "$mobile_aab" 1000006 0.1.6
-verify_bundle_manifest wear "$wear_aab" 2000008 0.1.7
+verify_bundle_manifest mobile "$mobile_aab" 1000008 0.1.8
+verify_bundle_manifest wear "$wear_aab" 2000009 0.1.8
 
 for aab in "$mobile_aab" "$wear_aab"; do
     printf 'Verified artifact: %s sha256=%s bytes=%s upload-cert-sha256=%s\n' \

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import app.zhanzhuang.timer.R
+import app.zhanzhuang.timer.mobile.ui.components.EIntervalTimer
 import app.zhanzhuang.timer.mobile.ui.TrainingUiState
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionStatus
@@ -147,6 +148,12 @@ private fun ActiveTraining(
     val paused = state.session?.status == SessionStatus.PAUSED
     val remainingDescription = stringResource(R.string.seconds_remaining, state.remainingMs / 1_000L)
     Text(if (paused) stringResource(R.string.paused) else if (state.session?.owner == SessionOwner.WEAR) stringResource(R.string.standing_on_watch) else stringResource(R.string.standing), style = MaterialTheme.typography.titleLarge)
+    EIntervalTimer(
+        activeElapsedMs = state.activeElapsedMs,
+        config = state.session?.config ?: state.config,
+        description = remainingDescription,
+        modifier = Modifier.padding(horizontal = 24.dp),
+    )
     Text(
         formatDuration(state.remainingMs),
         style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace),

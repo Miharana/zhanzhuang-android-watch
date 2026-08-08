@@ -1,12 +1,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#241C12" android:strokeColor="#A9863F" android:strokeWidth="1.1" android:pathData="M54,6.75A47.25,47.25 0,1 0,54,101.25A47.25,47.25 0,1 0,54,6.75"/>
-    <path android:name="head_ring" android:fillColor="#00000000" android:strokeColor="#E7D5A6" android:strokeWidth="3.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M54,24.05A5.91,5.91 0,1 1,54,35.87A5.91,5.91 0,1 1,54,24.05"/>
-    <group android:name="standing_taiji">
-        <path android:name="taiji_gold_disc" android:fillColor="#C6A867" android:pathData="M54,42.19A13.92,13.92 0,1 1,54,70.03A13.92,13.92 0,1 1,54,42.19"/>
-        <path android:name="taiji_soil_half" android:fillColor="#241C12" android:pathData="M54,42.19A13.92,13.92 0,0 1,54,70.03A6.96,6.96 0,0 1,54,56.11A6.96,6.96 0,0 0,54,42.19Z"/>
-        <path android:name="taiji_soil_dot" android:fillColor="#241C12" android:pathData="M54,47.23A1.79,1.79 0,1 1,54,50.81A1.79,1.79 0,1 1,54,47.23"/>
-        <path android:name="taiji_gold_dot" android:fillColor="#E7D5A6" android:pathData="M54,61.41A1.79,1.79 0,1 1,54,64.99A1.79,1.79 0,1 1,54,61.41"/>
+    <path android:name="e_outer_rim" android:fillColor="#00000000" android:strokeColor="#A9863F" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M54,10A44,44 0,1 0,54,98A44,44 0,1 0,54,10"/>
+    <path android:name="e_outer_highlight" android:fillColor="#00000000" android:strokeColor="#E7D5A6" android:strokeWidth="1.1" android:strokeLineCap="round" android:pathData="M22.9,22.9A44,44 0,0 1,48,10.4"/>
+    <group android:name="e_taiji">
+        <path android:name="taiji_gold_disc" android:fillColor="#C6A867" android:pathData="M54,24A14,14 0,1 1,54,52A14,14 0,1 1,54,24"/>
+        <path android:name="taiji_soil_half" android:fillColor="#15110B" android:pathData="M54,24A14,14 0,0 1,54,52A7,7 0,0 1,54,38A7,7 0,0 0,54,24Z"/>
+        <path android:name="taiji_soil_dot" android:fillColor="#15110B" android:pathData="M54,29.1A1.8,1.8 0,1 1,54,32.7A1.8,1.8 0,1 1,54,29.1"/>
+        <path android:name="taiji_gold_dot" android:fillColor="#E7D5A6" android:pathData="M54,43.3A1.8,1.8 0,1 1,54,46.9A1.8,1.8 0,1 1,54,43.3"/>
     </group>
-    <path android:name="left_parallel_leg" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="5.06" android:strokeLineCap="round" android:pathData="M46.5,66L46.5,82"/>
-    <path android:name="right_parallel_leg" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="5.06" android:strokeLineCap="round" android:pathData="M61.5,66L61.5,82"/>
+    <path android:name="e_lower_left_ring" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M39.9,58.9A7.9,7.9 0,1 0,39.9,74.7A7.9,7.9 0,1 0,39.9,58.9"/>
+    <path android:name="e_lower_right_ring" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M68.1,58.9A7.9,7.9 0,1 0,68.1,74.7A7.9,7.9 0,1 0,68.1,58.9"/>
+    <path android:name="e_glint" android:fillColor="#E7D5A6" android:pathData="M88,16L89.2,20.1L93.3,21.3L89.2,22.5L88,26.6L86.8,22.5L82.7,21.3L86.8,20.1Z"/>
 </vector>

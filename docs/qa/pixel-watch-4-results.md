@@ -1,6 +1,16 @@
 # Pixel Watch 4 physical QA results
 
-Last updated: 2026-08-07
+Last updated: 2026-08-09
+
+## 0.1.8 candidate boundary
+
+The next candidate is `0.1.8` / `1000008` (phone) and `0.1.8` / `2000009`
+(Wear). Automated checks cover its E timer resource, reminder-interval progress
+math, round-safe Wear layout build, and phone-side discovery of a watch session
+that began before the phone app opened. Physical Pixel Watch 4 and paired Data
+Layer verification remain **not run** until an authorized phone/watch ADB
+connection is available; no emulator or source check is treated as a physical
+pass.
 
 Physical Pixel Watch 4 evidence for the current `0.1.6` internal build is
 **not run**. On 2026-08-06, `adb devices -l` returned only the local Android

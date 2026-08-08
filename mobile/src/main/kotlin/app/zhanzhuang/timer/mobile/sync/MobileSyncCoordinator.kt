@@ -88,11 +88,20 @@ class MobileSyncCoordinator(
     /**
      * A reachable companion has returned. Ask it for the durable state of an
      * already watch-owned session; this never starts a foreground service.
+     *
+     * The phone may have been closed when the watch began a session, so there
+     * may be no local Wear record yet. In that case a neutral discovery
+     * envelope lets the watch return its actual durable record.
      */
     suspend fun queryCurrentWearState(): Boolean = mutex.withLock {
         val current = controller.current()
             ?.takeIf { it.owner == SessionOwner.WEAR && it.status in ACTIVE_STATUSES }
-            ?: return false
+            ?: SessionRecord(
+                id = WATCH_STATE_DISCOVERY_SESSION_ID,
+                revision = 0,
+                status = SessionStatus.IDLE,
+                owner = SessionOwner.MOBILE,
+            )
         transport.sendMessage(envelope(current, SyncPayload.QueryState))
     }
 
@@ -257,6 +266,7 @@ class MobileSyncCoordinator(
         const val QUERY_TIMEOUT_MS = 5_000L
         const val START_EXPIRY_MS = ACK_TIMEOUT_MS + QUERY_TIMEOUT_MS
         const val MAX_SEEN_EVENTS = 512
+        const val WATCH_STATE_DISCOVERY_SESSION_ID = "wear-state-discovery"
         val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
         val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }

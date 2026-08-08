@@ -1,6 +1,27 @@
 # Google Play release evidence
 
-Last updated: 2026-08-07 (UTC)
+Last updated: 2026-08-09 (UTC)
+
+## 0.1.8 E interval timer release candidate
+
+This candidate replaces the queued `0.1.4` phone and `0.1.7` Wear production
+changes after they were confirmed in Play Console as **Changes in review**, not
+as a formally published release. It uses version name `0.1.8`, version code
+`1000008` for phones/tablets, and version code `2000009` for Wear OS.
+
+The candidate unifies the launcher and running visual around the approved E
+mark: a gold taiji above two gold rings inside a retained thin gold rim. The
+active timer uses that same rim as a one-reminder-interval progress ring. It
+also fixes the recovery gap where a phone opened after a watch-originated start
+could not query and adopt the already-running Wear-owned session.
+
+Before signing, the no-clean Android gate passed the core/domain and both app
+unit suites, mobile and Wear debug lint, debug APK builds, release-manifest
+checks, version identity checks, resource checks, and forbidden-permission
+checks. The Play icon was regenerated from `fastlane/assets-source/icon.svg`
+for `en-GB`, `en-US`, and `zh-CN`. Signed AAB hashes, upload timestamp, and
+post-upload Android Publisher track readback are intentionally recorded only
+after the signed artifacts and remote commits exist.
 
 ## 0.1.7 Wear round-screen policy correction
 
