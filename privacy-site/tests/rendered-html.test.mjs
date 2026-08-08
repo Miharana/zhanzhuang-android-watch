@@ -23,6 +23,27 @@ async function render() {
   );
 }
 
+async function renderPath(pathname) {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("preview-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+
+  return worker.fetch(
+    new Request(`https://localhost${pathname}`, {
+      headers: { accept: "text/html" },
+    }),
+    {
+      ASSETS: {
+        fetch: async () => new Response("Not found", { status: 404 }),
+      },
+    },
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
 test("server-renders the bilingual privacy policy", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -80,4 +101,17 @@ test("uses the approved Urticad-inspired palette", async () => {
   ]) {
     assert.match(css, new RegExp(color, "i"));
   }
+});
+
+test("server-renders the four icon candidates for phone review", async () => {
+  const response = await renderPath("/icon-preview");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /图标方向/);
+  assert.match(html, /方案 A/);
+  assert.match(html, /方案 B/);
+  assert.match(html, /方案 C/);
+  assert.match(html, /方案 D/);
+  assert.match(html, /篆体桩/);
+  assert.match(html, /品字三圆/);
 });
