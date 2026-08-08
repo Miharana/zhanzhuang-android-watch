@@ -449,6 +449,16 @@ footer p {
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.35));
 }
 
+.icon-raster-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(216, 193, 140, 0.14);
+  border-radius: 17px;
+  background: var(--soil-deep);
+  object-fit: cover;
+}
+
 .icon-rim {
   fill: rgba(21, 17, 11, 0.68);
   stroke: url(#gold);

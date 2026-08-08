@@ -108,10 +108,15 @@ test("server-renders the four icon candidates for phone review", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /图标方向/);
-  assert.match(html, /方案 A/);
-  assert.match(html, /方案 B/);
-  assert.match(html, /方案 C/);
-  assert.match(html, /方案 D/);
-  assert.match(html, /篆体桩/);
-  assert.match(html, /品字三圆/);
+  assert.match(html, /方案 E/);
+  assert.match(html, /方案 F/);
+  assert.match(html, /方案 G/);
+  assert.match(html, /方案 H/);
+  assert.match(html, /鎏金圆润/);
+  assert.match(html, /线刻微光/);
+  for (const option of ["option-e", "option-f", "option-g", "option-h"]) {
+    assert.match(html, new RegExp(`/icon-preview/${option}\\.png`));
+  }
+  assert.match(html, /上方太极/);
+  assert.match(html, /下方双圆/);
 });
