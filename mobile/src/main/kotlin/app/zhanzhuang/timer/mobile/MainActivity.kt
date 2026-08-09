@@ -59,7 +59,7 @@ import app.zhanzhuang.timer.mobile.ui.screens.SettingsScreen
 import app.zhanzhuang.timer.mobile.ui.screens.TrainingScreen
 import app.zhanzhuang.timer.mobile.ui.theme.ZhanZhuangTheme
 import app.zhanzhuang.timer.model.SessionConfig
-import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_SYNC
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_WEAR
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
 import app.zhanzhuang.timer.model.shouldRequestNotificationPermission
@@ -235,13 +235,13 @@ private class AndroidWatchConnectionPort(
             if (reconnected) launch { runCatching { coordinator.queryCurrentWearState() } }
         }
         val listener = CapabilityClient.OnCapabilityChangedListener(::publish)
-        client.addListener(listener, CAPABILITY_ZHAN_ZHUANG_SYNC)
+        client.addListener(listener, CAPABILITY_ZHAN_ZHUANG_WEAR)
         launch {
-            runCatching { client.getCapability(CAPABILITY_ZHAN_ZHUANG_SYNC, CapabilityClient.FILTER_REACHABLE).await() }
+            runCatching { client.getCapability(CAPABILITY_ZHAN_ZHUANG_WEAR, CapabilityClient.FILTER_REACHABLE).await() }
                 .getOrNull()
                 .let(::publish)
         }
-        awaitClose { client.removeListener(listener, CAPABILITY_ZHAN_ZHUANG_SYNC) }
+        awaitClose { client.removeListener(listener, CAPABILITY_ZHAN_ZHUANG_WEAR) }
     }.distinctUntilChanged()
 
     private fun CapabilityInfo.toConnection(): WatchConnectionState = WatchConnectionState(

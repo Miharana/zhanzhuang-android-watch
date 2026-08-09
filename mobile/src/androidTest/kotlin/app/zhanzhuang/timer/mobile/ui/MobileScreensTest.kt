@@ -1,7 +1,9 @@
 package app.zhanzhuang.timer.mobile.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.runtime.CompositionLocalProvider
@@ -66,6 +68,26 @@ class MobileScreensTest {
         }
 
         rule.onNodeWithText("This session won't record heart rate").assertIsDisplayed()
+    }
+
+    @Test
+    fun trainingHeaderUsesBrandMarkInsteadOfBilingualTitle() {
+        rule.setContent {
+            TrainingScreen(
+                state = TrainingUiState(config = SessionConfig(), watchConnected = false),
+                onDurationChange = {},
+                onIntervalChange = {},
+                onStart = {},
+                onPause = {},
+                onResume = {},
+                onFinish = {},
+                onCancel = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Zhan Zhuang").assertIsDisplayed()
+        rule.onAllNodesWithText("站桩").assertCountEquals(0)
+        rule.onAllNodesWithText("Standing meditation").assertCountEquals(0)
     }
 
     @Test

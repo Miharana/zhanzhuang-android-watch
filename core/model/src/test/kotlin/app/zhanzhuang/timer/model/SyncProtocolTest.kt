@@ -6,8 +6,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SyncProtocolTest {
-    @Test fun capabilityNameRemainsBackwardCompatible() {
-        assertEquals("zhan_zhang_sync", CAPABILITY_ZHAN_ZHUANG_SYNC)
+    @Test fun capabilitiesDistinguishPhoneAndWatchNodes() {
+        assertEquals("zhan_zhang_phone_sync", CAPABILITY_ZHAN_ZHUANG_PHONE)
+        assertEquals("zhan_zhang_wear_sync", CAPABILITY_ZHAN_ZHUANG_WEAR)
     }
 
     @Test

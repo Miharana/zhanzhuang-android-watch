@@ -5,7 +5,7 @@ import androidx.room.Room
 import app.zhanzhuang.timer.wear.data.WearDatabase
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.model.PATH_ACK
-import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_SYNC
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_PHONE
 import app.zhanzhuang.timer.model.PATH_COMMAND
 import app.zhanzhuang.timer.model.PATH_COMPLETED
 import app.zhanzhuang.timer.model.PATH_STATE
@@ -103,7 +103,7 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
             else -> PATH_COMMAND
         }
         val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
-            .getCapability(CAPABILITY_ZHAN_ZHUANG_SYNC, CapabilityClient.FILTER_REACHABLE)
+            .getCapability(CAPABILITY_ZHAN_ZHUANG_PHONE, CapabilityClient.FILTER_REACHABLE)
             .await()
             .nodes } ?: return false
         return nodes.map { node ->

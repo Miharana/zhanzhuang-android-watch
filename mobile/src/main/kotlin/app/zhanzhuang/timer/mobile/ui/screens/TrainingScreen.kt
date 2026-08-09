@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import app.zhanzhuang.timer.R
+import app.zhanzhuang.timer.mobile.ui.components.EBrandMark
 import app.zhanzhuang.timer.mobile.ui.components.EIntervalTimer
 import app.zhanzhuang.timer.mobile.ui.TrainingUiState
 import app.zhanzhuang.timer.model.SessionOwner
@@ -66,11 +67,12 @@ fun TrainingScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(stringResource(R.string.brand_chinese), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.standing_meditation), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EBrandMark(description = stringResource(R.string.app_name))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(stringResource(R.string.history), onHistory)
                     TextButton(stringResource(R.string.settings), onSettings)
