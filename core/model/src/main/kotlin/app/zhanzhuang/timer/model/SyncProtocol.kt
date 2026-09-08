@@ -10,6 +10,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 const val PROTOCOL_VERSION = 1
+/** Capability announced only by the phone app and queried by the Wear app. */
+const val CAPABILITY_ZHAN_ZHUANG_PHONE = "zhan_zhang_phone_sync"
+
+/** Capability announced only by the Wear app and queried by the phone app. */
+const val CAPABILITY_ZHAN_ZHUANG_WEAR = "zhan_zhang_wear_sync"
 const val PATH_COMMAND = "/zhan-zhuang/v1/command"
 const val PATH_STATE = "/zhan-zhuang/v1/state"
 const val PATH_COMPLETED = "/zhan-zhuang/v1/completed"

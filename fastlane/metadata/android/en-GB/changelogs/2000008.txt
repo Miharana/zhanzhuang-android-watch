@@ -1,0 +1,1 @@
+Fixes round-screen Wear OS layouts so session controls and confirmation actions stay fully visible.

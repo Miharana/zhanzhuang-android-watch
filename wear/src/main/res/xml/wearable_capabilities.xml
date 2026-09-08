@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <capabilities>
-    <capability name="zhan_zhang_sync" />
+    <capability name="zhan_zhang_wear_sync" />
 </capabilities>

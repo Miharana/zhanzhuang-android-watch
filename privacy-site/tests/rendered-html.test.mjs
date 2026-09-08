@@ -23,6 +23,27 @@ async function render() {
   );
 }
 
+async function renderPath(pathname) {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("preview-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+
+  return worker.fetch(
+    new Request(`https://localhost${pathname}`, {
+      headers: { accept: "text/html" },
+    }),
+    {
+      ASSETS: {
+        fetch: async () => new Response("Not found", { status: 404 }),
+      },
+    },
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
 test("server-renders the bilingual privacy policy", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -80,4 +101,22 @@ test("uses the approved Urticad-inspired palette", async () => {
   ]) {
     assert.match(css, new RegExp(color, "i"));
   }
+});
+
+test("server-renders the four icon candidates for phone review", async () => {
+  const response = await renderPath("/icon-preview");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /图标方向/);
+  assert.match(html, /方案 E/);
+  assert.match(html, /方案 F/);
+  assert.match(html, /方案 G/);
+  assert.match(html, /方案 H/);
+  assert.match(html, /鎏金圆润/);
+  assert.match(html, /线刻微光/);
+  for (const option of ["option-e", "option-f", "option-g", "option-h"]) {
+    assert.match(html, new RegExp(`/icon-preview/${option}\\.png`));
+  }
+  assert.match(html, /上方太极/);
+  assert.match(html, /下方双圆/);
 });

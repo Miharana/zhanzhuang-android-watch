@@ -1,0 +1,1 @@
+Fixes a launch crash by avoiding foreground recovery when no active session exists.

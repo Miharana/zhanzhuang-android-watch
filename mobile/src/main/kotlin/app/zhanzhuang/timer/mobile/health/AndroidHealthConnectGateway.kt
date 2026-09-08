@@ -24,6 +24,7 @@ enum class HealthSessionRecordKind { MINDFULNESS, EXERCISE }
 @OptIn(ExperimentalMindfulnessSessionApi::class)
 class AndroidHealthConnectGateway(
     private val context: Context,
+    private val exportConsent: HealthExportConsent = SharedPreferencesHealthExportConsent(context),
 ) : HealthConnectGateway {
     override suspend fun availability(): HealthAvailability = try {
         if (HealthConnectClient.getSdkStatus(context) != HealthConnectClient.SDK_AVAILABLE) {
@@ -47,11 +48,14 @@ class AndroidHealthConnectGateway(
     override fun requiredWritePermissions(includeHeartRate: Boolean): Set<String> =
         writeOnlyPermissions(includeHeartRate)
 
-    override suspend fun write(record: SessionRecord): HealthWriteResult = try {
-        writeInternal(record)
-    } catch (error: Exception) {
-        if (error is CancellationException) throw error
-        error.toWriteFailure()
+    override suspend fun write(record: SessionRecord): HealthWriteResult {
+        if (!exportConsent.isAccepted()) return HealthWriteResult.ConsentMissing
+        return try {
+            writeInternal(record)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            error.toWriteFailure()
+        }
     }
 
     private suspend fun writeInternal(record: SessionRecord): HealthWriteResult {

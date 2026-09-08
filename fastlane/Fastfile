@@ -17,6 +17,7 @@ platform :android do
       package_name: "app.zhanzhuang.timer",
       metadata_path: "fastlane/metadata/android",
       track: "internal",
+      changes_not_sent_for_review: true,
       skip_upload_aab: true,
       skip_upload_apk: true,
       skip_upload_changelogs: true
@@ -31,7 +32,24 @@ platform :android do
       aab: "mobile/build/outputs/bundle/release/mobile-release.aab",
       metadata_path: "fastlane/metadata/android",
       track: "internal",
-      release_status: "completed"
+      release_status: "completed",
+      changes_not_sent_for_review: true,
+    )
+  end
+
+  desc "Upload only the verified mobile AAB to internal testing"
+  lane :upload_mobile_internal_binary_only do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      aab: "mobile/build/outputs/bundle/release/mobile-release.aab",
+      track: "internal",
+      release_status: "completed",
+      changes_not_sent_for_review: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
     )
   end
 
@@ -44,9 +62,11 @@ platform :android do
       metadata_path: "fastlane/metadata/android",
       track: "wear:internal",
       release_status: "completed",
+      changes_not_sent_for_review: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
-      skip_upload_screenshots: true
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
     )
   end
 
@@ -57,8 +77,9 @@ platform :android do
       package_name: "app.zhanzhuang.timer",
       track: "internal",
       track_promote_to: "production",
-      track_promote_release_status: "draft",
-      version_code: 1_000_001,
+      track_promote_release_status: "completed",
+      changes_not_sent_for_review: true,
+      version_code: 1_000_011,
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
@@ -73,8 +94,9 @@ platform :android do
       package_name: "app.zhanzhuang.timer",
       track: "wear:internal",
       track_promote_to: "wear:production",
-      track_promote_release_status: "draft",
-      version_code: 2_000_001,
+      track_promote_release_status: "completed",
+      changes_not_sent_for_review: true,
+      version_code: 2_000_013,
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,

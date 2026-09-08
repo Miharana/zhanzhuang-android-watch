@@ -1,1 +1,13 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#241C12" android:pathData="M54,8A46,46 0,1 0,54,100A46,46 0,1 0,54,8"/><path android:fillColor="#E7D5A6" android:pathData="M50,27L58,27L60,43L67,55L64,81L44,81L41,55L48,43Z"/><path android:fillColor="#C6A867" android:pathData="M50,27L54,27L54,81L44,81L41,55L48,43Z"/><path android:fillColor="#A9863F" android:pathData="M54,27L58,27L60,43L67,55L64,81L54,81Z"/><path android:fillColor="#D8C18C" android:pathData="M48,43L41,55L44,58L52,48ZM60,43L67,55L64,58L56,48Z"/><path android:fillColor="#FFF4D6" android:pathData="M76,23L78,29L84,31L78,33L76,39L74,33L68,31L74,29Z"/></vector>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:name="e_outer_rim" android:fillColor="#00000000" android:strokeColor="#A9863F" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M54,10A44,44 0,1 0,54,98A44,44 0,1 0,54,10"/>
+    <path android:name="e_outer_highlight" android:fillColor="#00000000" android:strokeColor="#E7D5A6" android:strokeWidth="1.1" android:strokeLineCap="round" android:pathData="M22.9,22.9A44,44 0,0 1,48,10.4"/>
+    <group android:name="e_taiji">
+        <path android:name="taiji_gold_disc" android:fillColor="#C6A867" android:pathData="M54,24A14,14 0,1 1,54,52A14,14 0,1 1,54,24"/>
+        <path android:name="taiji_soil_half" android:fillColor="#15110B" android:pathData="M54,24A14,14 0,0 1,54,52A7,7 0,0 1,54,38A7,7 0,0 0,54,24Z"/>
+        <path android:name="taiji_soil_dot" android:fillColor="#15110B" android:pathData="M54,29.1A1.8,1.8 0,1 1,54,32.7A1.8,1.8 0,1 1,54,29.1"/>
+        <path android:name="taiji_gold_dot" android:fillColor="#E7D5A6" android:pathData="M54,43.3A1.8,1.8 0,1 1,54,46.9A1.8,1.8 0,1 1,54,43.3"/>
+    </group>
+    <path android:name="e_lower_left_ring" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M39.9,58.9A7.9,7.9 0,1 0,39.9,74.7A7.9,7.9 0,1 0,39.9,58.9"/>
+    <path android:name="e_lower_right_ring" android:fillColor="#00000000" android:strokeColor="#C6A867" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M68.1,58.9A7.9,7.9 0,1 0,68.1,74.7A7.9,7.9 0,1 0,68.1,58.9"/>
+    <path android:name="e_glint" android:fillColor="#E7D5A6" android:pathData="M88,16L89.2,20.1L93.3,21.3L89.2,22.5L88,26.6L86.8,22.5L82.7,21.3L86.8,20.1Z"/>
+</vector>

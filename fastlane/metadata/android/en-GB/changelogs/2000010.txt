@@ -1,0 +1,1 @@
+Improves the paired-session release and keeps the Wear timer stable while phone control recovers.
