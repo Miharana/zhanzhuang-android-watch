@@ -39,6 +39,7 @@ import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
 import app.zhanzhuang.timer.mobile.health.AndroidHealthConnectGateway
 import app.zhanzhuang.timer.mobile.health.HealthPermissionState
 import app.zhanzhuang.timer.mobile.health.HealthSyncWorker
+import app.zhanzhuang.timer.mobile.health.SharedPreferencesHealthExportConsent
 import app.zhanzhuang.timer.mobile.session.MobileSessionService
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiBridge
 import app.zhanzhuang.timer.mobile.sync.MobileSyncCoordinator
@@ -135,7 +136,7 @@ class MainActivity : ComponentActivity() {
                     health = state.health,
                     onDurationChange = model::selectDuration,
                     onIntervalChange = model::selectInterval,
-                    onRequestHealthPermission = model::requestHealthPermissions,
+                    onAcceptHealthDisclosure = model::requestHealthPermissions,
                     onRetryHealth = model::retryHealthSync,
                     onBack = { model.open(MobileDestination.TRAINING) },
                 )
@@ -162,7 +163,8 @@ private class MainViewModelFactory(private val context: Context) : ViewModelProv
                 .addMigrations(MobileDatabase.MIGRATION_1_2)
                 .build(),
         )
-        val gateway = AndroidHealthConnectGateway(context)
+        val healthConsent = SharedPreferencesHealthExportConsent(context)
+        val gateway = AndroidHealthConnectGateway(context, healthConsent)
         val coordinator = MobileSyncRuntime.get(context)
         return MainViewModel(
             repository = repository,
@@ -173,6 +175,7 @@ private class MainViewModelFactory(private val context: Context) : ViewModelProv
             wearRuntime = object : WearRuntimePort { override val states = MobileWearRuntimeBridge.runtime },
             healthGateway = gateway,
             healthPermission = AndroidHealthPermissionPort(context),
+            healthExportConsent = healthConsent,
             reconcileHealth = { HealthSyncWorker.reconcile(context) },
         ) as T
     }
@@ -188,17 +191,23 @@ private class AndroidTrainingActions(
         if (watchReachable) coordinator.startFromMobile(config) else coordinator.startOnMobile(config)
 
     override suspend fun pause(record: SessionRecord) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestPause(record.id)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestPause(record.id)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_PAUSE)
     }
 
     override suspend fun resume(record: SessionRecord) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestResume(record.id)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestResume(record.id)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_RESUME)
     }
 
     override suspend fun finish(record: SessionRecord, cancelled: Boolean) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestFinish(record.id, cancelled)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestFinish(record.id, cancelled)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_FINISH, cancelled)
     }
 }

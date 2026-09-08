@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -51,11 +52,22 @@ fun SetupScreen(
         ) {
             item {
                 val itemScope = this
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(stringResource(R.string.duration), color = colors.primaryContainer)
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        stringResource(R.string.duration),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = colors.primaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
                     StepperRow(
                         value = stringResource(R.string.minutes_value, config.durationMinutes),
                         description = stringResource(R.string.duration_description, config.durationMinutes),
@@ -76,11 +88,22 @@ fun SetupScreen(
             }
             item {
                 val itemScope = this
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(stringResource(R.string.interval), color = colors.primaryContainer)
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        stringResource(R.string.interval),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = colors.primaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
                     StepperRow(
                         value = stringResource(R.string.every_minutes, config.intervalMinutes),
                         description = stringResource(R.string.interval_description, config.intervalMinutes),
@@ -116,7 +139,24 @@ fun SetupScreen(
                 )
             }
             item { Spacer(modifier = Modifier.height(RoundShortcutTopSafeSpace)) }
-            item { Text(stringResource(R.string.shortcuts), color = colors.primaryContainer) }
+            item {
+                val itemScope = this
+                Text(
+                    stringResource(R.string.shortcuts),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 8.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.primaryContainer,
+                    textAlign = TextAlign.Center,
+                )
+            }
             listOf(15, 30, 45, 60, 90, 120, 180).forEach { minutes ->
                 item {
                     SoilAction(stringResource(R.string.minutes_value, minutes), stringResource(R.string.set_duration, minutes), onClick = {
@@ -133,6 +173,7 @@ fun SetupScreen(
                         .minimumVerticalContentPadding(ButtonDefaults.minimumVerticalListContentPadding))
                 }
             }
+            item { Spacer(modifier = Modifier.height(RoundActionBottomSafeSpace)) }
         }
     }
 }
@@ -147,7 +188,15 @@ private fun StepperRow(
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         SoilAction("−", stringResource(R.string.decrease, description), onDecrease, Modifier.weight(1f))
-        Text(value, modifier = Modifier.weight(2f).semantics { stateDescription = description }, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            value,
+            modifier = Modifier
+                .weight(2f)
+                .padding(horizontal = 6.dp)
+                .semantics { stateDescription = description },
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
         SoilAction("+", stringResource(R.string.increase, description), onIncrease, Modifier.weight(1f))
     }
 }

@@ -2,11 +2,16 @@ package app.zhanzhuang.timer.wear.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -50,10 +55,62 @@ fun CompletionScreen(state: WearSessionUiState, onDone: () -> Unit, modifier: Mo
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll),
             rotaryScrollableBehavior = RotaryScrollableDefaults.snapBehavior(scrollableState = scroll),
         ) {
-            item { Text(statusLabel, color = colors.primaryContainer, fontWeight = FontWeight.Bold) }
-            item { Text(formatWearDuration(state.record?.activeDurationMs ?: 0L), color = colors.onBackground) }
+            item {
+                val itemScope = this
+                Text(
+                    statusLabel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.primaryContainer,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            item {
+                val itemScope = this
+                Text(
+                    formatWearDuration(state.record?.activeDurationMs ?: 0L),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.onBackground,
+                    textAlign = TextAlign.Center,
+                )
+            }
             state.currentHeartRateBpm?.let { bpm ->
-                item { Text(stringResource(R.string.last_heart_rate, bpm.toInt()), color = colors.primaryContainer) }
+                item {
+                    val itemScope = this
+                    Text(
+                        stringResource(R.string.last_heart_rate, bpm.toInt()),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = colors.primaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             item {
                 GoldAction(
@@ -71,6 +128,7 @@ fun CompletionScreen(state: WearSessionUiState, onDone: () -> Unit, modifier: Mo
                         .minimumVerticalContentPadding(ButtonDefaults.minimumVerticalListContentPadding),
                 )
             }
+            item { Spacer(modifier = Modifier.height(RoundActionBottomSafeSpace)) }
         }
     }
 }

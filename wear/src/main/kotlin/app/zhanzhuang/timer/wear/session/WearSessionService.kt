@@ -84,9 +84,19 @@ class WearSessionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = commandFrom(intent) ?: Command.Status
+        val preferences = getSharedPreferences(WearSessionRecoveryPolicy.PREFERENCES_NAME, Context.MODE_PRIVATE)
+        if (command == Command.Status && !WearSessionRecoveryPolicy.hasSnapshot(preferences)) {
+            // Defensive guard for stale/system callers. A clean install has no
+            // recoverable work and must not enter the foreground-service path.
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val commandGeneration = generation.incrementAndGet()
-        // This satisfies the FGS deadline; the recovery-only notification has no OngoingActivity extension.
-        promoteToForeground()
+        if (command != Command.Status || WearSessionRecoveryPolicy.statusRequiresForeground(preferences)) {
+            // This satisfies the FGS deadline for active work; the recovery-only
+            // notification has no OngoingActivity extension.
+            promoteToForeground()
+        }
         requests.trySend(ServiceRequest.Command(command, intent?.getStringExtra(EXTRA_SESSION_ID), intent?.getStringExtra(EXTRA_REQUEST_ID), startId, commandGeneration))
         return START_STICKY
     }

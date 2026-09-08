@@ -3,6 +3,8 @@ package app.zhanzhuang.timer.wear.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +17,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -58,7 +62,24 @@ fun ActiveSessionScreen(
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll),
             rotaryScrollableBehavior = RotaryScrollableDefaults.snapBehavior(scrollableState = scroll),
         ) {
-            item { Text(if (paused) stringResource(R.string.paused) else stringResource(R.string.standing), color = colors.primaryContainer) }
+            item {
+                val itemScope = this
+                Text(
+                    if (paused) stringResource(R.string.paused) else stringResource(R.string.standing),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.primaryContainer,
+                    textAlign = TextAlign.Center,
+                )
+            }
             item {
                 EIntervalTimer(
                     activeElapsedMs = state.record?.let { record ->
@@ -73,16 +94,66 @@ fun ActiveSessionScreen(
                 )
             }
             item {
-            Text(
-                text = if (ambient) stringResource(R.string.minutes_value, (state.remainingMs + 59_999L) / 60_000L) else formatWearDuration(state.remainingMs),
-                color = colors.onBackground,
-                style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace, fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { stateDescription = remainingDescription },
-            )
+                val itemScope = this
+                Text(
+                    text = if (ambient) stringResource(R.string.minutes_value, (state.remainingMs + 59_999L) / 60_000L) else formatWearDuration(state.remainingMs),
+                    color = colors.onBackground,
+                    style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace, fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .semantics { stateDescription = remainingDescription }
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                )
             }
-            state.currentHeartRateBpm?.let { bpm -> item { Text(stringResource(R.string.last_heart_rate, bpm.toInt()), color = colors.primaryContainer) } }
-            state.heartRateUnavailableReason?.let { item { Text(stringResource(R.string.duration_only), color = colors.primaryContainer) } }
+            state.currentHeartRateBpm?.let { bpm ->
+                item {
+                    val itemScope = this
+                    Text(
+                        stringResource(R.string.last_heart_rate, bpm.toInt()),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = colors.primaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            state.heartRateUnavailableReason?.let {
+                item {
+                    val itemScope = this
+                    Text(
+                        stringResource(R.string.duration_only),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = colors.primaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
             item {
                 val label = if (paused) stringResource(R.string.resume_session) else stringResource(R.string.pause_session)
                 val actionModifier = Modifier
@@ -114,6 +185,7 @@ fun ActiveSessionScreen(
                         .minimumVerticalContentPadding(ButtonDefaults.minimumVerticalListContentPadding),
                 )
             }
+            item { Spacer(modifier = Modifier.height(RoundActionBottomSafeSpace)) }
         }
     }
     if (confirmingFinish) EndSessionConfirmation(
@@ -139,7 +211,24 @@ private fun EndSessionConfirmation(onDismiss: () -> Unit, onConfirm: () -> Unit,
                 flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll),
                 rotaryScrollableBehavior = RotaryScrollableDefaults.snapBehavior(scrollableState = scroll),
             ) {
-                item { Text(stringResource(R.string.end_session_question), color = MaterialTheme.colorScheme.onBackground) }
+                item {
+                    val itemScope = this
+                    Text(
+                        stringResource(R.string.end_session_question),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = RoundScreenHorizontalPadding, vertical = 8.dp)
+                            .transformedHeight(itemScope, transformationSpec)
+                            .graphicsLayer {
+                                with(SurfaceTransformation(transformationSpec)) {
+                                    applyContentTransformation()
+                                    applyContainerTransformation()
+                                }
+                            },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 item {
                     GoldAction(
                         stringResource(R.string.end_session),
@@ -190,6 +279,7 @@ private fun EndSessionConfirmation(onDismiss: () -> Unit, onConfirm: () -> Unit,
                             .minimumVerticalContentPadding(ButtonDefaults.minimumVerticalListContentPadding),
                     )
                 }
+                item { Spacer(modifier = Modifier.height(RoundActionBottomSafeSpace)) }
             }
         }
     }

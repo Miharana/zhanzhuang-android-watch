@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.rememberAmbientModeManager
 import androidx.wear.compose.material3.AppScaffold
@@ -33,6 +34,8 @@ import app.zhanzhuang.timer.model.shouldRequestNotificationPermission
 import app.zhanzhuang.timer.wear.session.WearSessionService
 import app.zhanzhuang.timer.wear.session.WearSessionUiBridge
 import app.zhanzhuang.timer.wear.session.WearSessionUiState
+import app.zhanzhuang.timer.wear.session.WearSessionRecoveryPolicy
+import app.zhanzhuang.timer.wear.session.WearSessionRecoveryPolicy.PREFERENCES_NAME
 import app.zhanzhuang.timer.wear.ui.components.GoldSparkle
 import app.zhanzhuang.timer.wear.ui.screens.ActiveSessionScreen
 import app.zhanzhuang.timer.wear.ui.screens.CompletionScreen
@@ -56,6 +59,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             ZhanZhuangWearTheme {
@@ -79,7 +83,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        sendService(WearSessionService.ACTION_STATUS)
+        requestStatusIfRecoverable()
     }
 
     private fun continueStartAfterNotificationPermission() {
@@ -92,6 +96,20 @@ class MainActivity : ComponentActivity() {
 
     private fun sendService(action: String) {
         ContextCompat.startForegroundService(this, Intent(this, WearSessionService::class.java).setAction(action))
+    }
+
+    private fun requestStatusIfRecoverable() {
+        val preferences = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+        if (!WearSessionRecoveryPolicy.hasSnapshot(preferences)) return
+
+        val intent = Intent(this, WearSessionService::class.java).setAction(WearSessionService.ACTION_STATUS)
+        if (WearSessionRecoveryPolicy.statusRequiresForeground(preferences)) {
+            ContextCompat.startForegroundService(this, intent)
+        } else {
+            // A terminal snapshot only needs to republish the completion state.
+            // Do not promote a health service when no timer is active.
+            startService(intent)
+        }
     }
 
     private fun needsHeartRatePermission(): Boolean = heartRatePermissions().any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }

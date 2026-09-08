@@ -69,6 +69,19 @@ class MobileRepositorySyncController(
         }
     }
 
+    override suspend fun abandon(sessionId: String): Boolean {
+        val current = repository.get(sessionId) ?: return false
+        if (current.owner != SessionOwner.MOBILE || current.status !in ACTIVE_STATUSES) return false
+        repository.upsert(
+            current.copy(
+                status = SessionStatus.INTERRUPTED,
+                revision = current.revision + 1,
+                endEpochMillis = nowEpochMillis(),
+            ),
+        )
+        return true
+    }
+
     override suspend fun mergeRemote(record: SessionRecord): SessionRecord {
         val current = repository.get(record.id)
         val winner = resolver.merge(current, record)

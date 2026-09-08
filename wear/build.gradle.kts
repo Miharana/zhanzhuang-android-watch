@@ -13,8 +13,8 @@ android {
         applicationId = "app.zhanzhuang.timer"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2_000_009
-        versionName = "0.1.8"
+        versionCode = 2_000_013
+        versionName = "0.1.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.androidx.health.services.client)
     implementation(libs.androidx.wear.ongoing)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.play.services.wearable)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(platform(libs.androidx.compose.bom))

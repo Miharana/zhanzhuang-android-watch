@@ -2,11 +2,15 @@ package app.zhanzhuang.timer.wear.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -34,8 +38,42 @@ fun PermissionScreen(onAllow: () -> Unit, onContinueWithoutHeartRate: () -> Unit
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = scroll),
             rotaryScrollableBehavior = RotaryScrollableDefaults.snapBehavior(scrollableState = scroll),
         ) {
-            item { Text(stringResource(R.string.heart_rate_optional), color = colors.primaryContainer) }
-            item { Text(stringResource(R.string.heart_rate_permission_info), color = colors.onBackground) }
+            item {
+                val itemScope = this
+                Text(
+                    stringResource(R.string.heart_rate_optional),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.primaryContainer,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            item {
+                val itemScope = this
+                Text(
+                    stringResource(R.string.heart_rate_permission_info),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = RoundScreenHorizontalPadding, vertical = 6.dp)
+                        .transformedHeight(itemScope, transformationSpec)
+                        .graphicsLayer {
+                            with(SurfaceTransformation(transformationSpec)) {
+                                applyContentTransformation()
+                                applyContainerTransformation()
+                            }
+                        },
+                    color = colors.onBackground,
+                    textAlign = TextAlign.Center,
+                )
+            }
             item {
                 GoldAction(
                     stringResource(R.string.allow_heart_rate),
@@ -69,6 +107,7 @@ fun PermissionScreen(onAllow: () -> Unit, onContinueWithoutHeartRate: () -> Unit
                         .minimumVerticalContentPadding(ButtonDefaults.minimumVerticalListContentPadding),
                 )
             }
+            item { Spacer(modifier = Modifier.height(RoundActionBottomSafeSpace)) }
         }
     }
 }

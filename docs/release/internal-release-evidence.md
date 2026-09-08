@@ -1,6 +1,221 @@
 # Google Play release evidence
 
-Last updated: 2026-08-09 (UTC)
+Last updated: 2026-08-31 (UTC)
+
+## Android Developer account identity
+
+The only authorized Android Developer / Google Play Console account for this
+app is `wangyal@urticad.com` under `Urticad Tech Ltd` (developer ID
+`7258731265136907307`). Do not use `scorpiocn@gmail.com` as the developer
+account.
+
+## 0.1.11 mobile + 0.1.12 Wear broken-functionality crash resubmission
+
+Google Play rejected Wear version code `2000012` on 2026-08-30 under
+**Broken Functionality policy**. The Play issue details identify **Crashes for
+users** and say that the app opens but keeps crashing; the attached review
+capture shows the system-level “Zhan Zhuang keeps stopping” dialog. The Gmail
+inbox has not yet received a separate 2000012 message, so the Play Console
+issue record and its attached capture are the authoritative evidence.
+
+Code review found that a fresh Wear launch unconditionally started
+`ACTION_STATUS` through `startForegroundService()` even when no session
+snapshot existed. That unnecessarily entered the Room/Health Services/
+foreground-notification path before the setup screen. The fix adds one shared
+recovery policy: a fresh install skips status recovery, an active snapshot is
+allowed to use the foreground service, and a terminal snapshot is republished
+without foreground promotion. Boot recovery and the service entry point apply
+the same fail-closed guard.
+
+The compliance review also found that mobile Health Connect writes could be
+scheduled by `HealthSyncWorker` after runtime permission had been granted
+without a separately persisted in-app disclosure acceptance. The mobile fix
+adds a prominent Settings disclosure naming completed sessions and optional
+heart-rate samples, requires explicit acceptance immediately before the system
+permission request, persists that acceptance, and blocks both gateway writes and
+background reconciliation until the acceptance and runtime permission are
+available.
+
+The follow-up Play Policy Insights audit on 2026-08-31 found no Critical or
+Important code-compliance findings. The Health Connect data-flow findings were
+pruned after verifying the affirmative disclosure gate and both write-boundary
+checks. The only remaining item is the routine Play Console confirmation that
+the mobile `specialUse` and Wear `health|specialUse` foreground-service
+declarations describe the timer and include the required reviewer evidence.
+
+| Surface | Version code | Version name | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | --- | ---: | --- |
+| Phones/tablets | `1000011` | `0.1.11` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10728302` | `87c504798e77ed0ee4007f280ce14a9b8811ca284ce36e1145b79e2518ba85c1` |
+| Wear OS | `2000013` | `0.1.12` | `wear/build/outputs/bundle/release/wear-release.aab` | `10280590` | `4ab1218bd894ad5949f25cd5004448404d4c0db740c8fa08cb2f55141f248545` |
+
+Verification completed before upload:
+
+- Wear recovery-policy regression tests cover fresh, active, terminal, and
+  malformed snapshots.
+- Mobile Health Connect consent tests cover default denial, persisted
+  acceptance, ViewModel permission gating, and background-worker no-write
+  behavior before acceptance.
+- Full Android unit tests, Wear unit tests, debug lint/builds, release lint,
+  signed AAB verification, manifest/resource/permission contracts, and release
+  contract tests passed.
+- API 36 Wear cold launch after data clear succeeded with the signed `2000013`
+  APK; the process remained alive, no `WearSessionService` was started, and no
+  fatal exception, security exception, or system crash dialog was observed.
+- API 33 mobile cold launch after data clear succeeded with `1000011` and
+  the process remained alive without fatal, security, or system crash output.
+- The andship lanes uploaded mobile `1000011` to `internal`, promoted it to
+  `production`, and retained Wear `2000013` on both Wear tracks with
+  `changes_not_sent_for_review=true`.
+
+Android Publisher readback after the upload and promotion returned:
+
+- `internal|completed|1000011`
+- `production|completed|1000011`
+- `wear:internal|completed|2000013`
+- `wear:production|completed|2000013`
+
+On 2026-08-31, Codex Browser reconfirmed the authorized
+`wangyal@urticad.com` session under `Urticad Tech Ltd`. Publishing overview
+prepared **15 changes for review**, including phone `0.1.11`, Wear `0.1.12`,
+and the existing listing/App content changes. After the owner's explicit
+confirmation, the final **Send changes for review** action completed and the
+page now shows **Changes in review** for both production surfaces. Play's
+automated quick checks continue in the background and will forward the changes
+to review when they complete successfully.
+
+## 0.1.10 / 0.1.11 Wear splash-screen policy resubmission
+
+Google Play Support rejected Wear version code `2000011` on 2026-08-25 for
+**Wear App Quality Guidelines: Missing app icon in splash screen**. The notice
+specified that app startup must show a 48x48dp app icon on a black background.
+
+The Wear launch path now uses AndroidX Core Splashscreen `1.2.0`, a black
+starting theme, a centered 48dp layer-list icon that reuses the launcher
+identity, and `installSplashScreen()` before the activity is created. The
+mobile candidate was advanced alongside the Wear fix so the Android release
+uses one coordinated review submission.
+
+| Surface | Version code | Version name | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | --- | ---: | --- |
+| Phones/tablets | `1000010` | `0.1.10` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10723057` | `1b2169b06041f4f71033f16af3a1af8734f7a0839c10fe1cf91856d31aa7b0a5` |
+| Wear OS | `2000012` | `0.1.11` | `wear/build/outputs/bundle/release/wear-release.aab` | `10279695` | `7e23f3976502d703f5d97351761be3c839104d3d8dd40653073b60c58cc4dc75` |
+
+The signed release verifier, JVM tests, release lint, AAB manifest/resource
+checks, signing-certificate check, and release contract tests passed. The
+andship lanes uploaded the mobile AAB to `internal`, the Wear AAB to
+`wear:internal`, and promoted both candidates to their corresponding
+production tracks with `changesNotSentForReview=true`.
+
+Android Publisher readback after the upload and promotion returned:
+
+- `internal|completed|1000010`
+- `production|completed|1000010`
+- `wear:internal|completed|2000012`
+- `wear:production|completed|2000012`
+
+On 2026-08-25, Codex Browser confirmed the authorized `wangyal@urticad.com`
+session under `Urticad Tech Ltd`. Play Console Submission `15` was submitted
+at `Aug 25, 2026, 4:52 pm` and is **In review**, containing both phone
+Production `0.1.10` and Wear Production `0.1.11` plus the associated listing,
+App content, advanced distribution, and store-setting changes.
+
+Post-submission checks show Policy status **Update in review**. App content
+has no declarations under **Need attention**; all 11 declarations, including
+Data safety, Health apps, foreground-service permissions, Content ratings,
+Ads, Privacy policy, and Target audience, are actioned and currently **In
+review**. The visible “Missing app icon in splash screen” entry is the prior
+rejected submission record, not a new issue.
+
+## 0.1.10 Wear default-font clipping correction
+
+Google Play Support rejected Wear version `2000010` on 2026-08-18 under
+**Wear app functionality not working as described**: the reviewer found text
+cut off at the default font size. The earlier reviewer captures
+`IN_APP_EXPERIENCE-8439.png` (setup) and `IN_APP_EXPERIENCE-3089.png`
+(end-confirmation) show the affected round-screen edge layout.
+
+The correction applies round-safe horizontal insets, `transformedHeight`, and
+`SurfaceTransformation` to every user-visible Wear text path; adds inner
+horizontal room and centered wrapping to custom actions; reduces the setup
+heading padding so the primary action remains fully visible; and adds top/bottom
+scroll safety space so first and last controls can be brought fully into view.
+The Wear UI tests now scroll to action items before interacting with them rather
+than assuming uncomposed lazy-list items are present.
+
+Verification completed on the task-created 454px Wear OS 4 round emulator
+(Android 13/API 33): all 5 Wear instrumentation tests passed, including setup,
+end confirmation, cancellation, and the real foreground-service pause/resume/
+finish/persistence flow. The no-clean Android checks, release lint, signed AAB
+integrity, upload-certificate, version, form-factor, and forbidden-permission
+contracts also passed.
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets (unchanged) | `1000009` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10722636` | `7047ae52147e1132f3e5c8c17523614bdc24aef18cf1bbc26c1cbadb50ccbc7d` |
+| Wear OS | `2000011` | `wear/build/outputs/bundle/release/wear-release.aab` | `10221990` | `4a76d55793ab44463e29971d8f03ac71d247440dfb2493965bbda88a2445ed57` |
+
+The andship release lane (Fastlane supply backend) successfully uploaded Wear
+`2000011` to `wear:internal` and promoted it to `wear:production` with
+completed release status. Sequential Publisher readback confirmed
+`wear:production` contains version code `2000011`; promotion
+superseded/deactivated the internal origin release. A later local andship
+release verification rebuilt both signed candidates and passed all checks; it
+was not uploaded again because version code `2000011` is already immutable on
+the production track.
+
+On 2026-08-18, Codex Browser confirmed the authorized Play Console session as
+`wangyal@urticad.com` under `Urticad Tech Ltd`. Publishing overview showed
+`15` changes, including phone Production `0.1.9` and Wear Production `0.1.10`.
+After explicit confirmation, **Submit 15 changes for review** was completed;
+the page now shows **Changes in review** and confirms that the changes are now
+in review. The submit button is no longer present.
+
+The automated Play Policy Insights scan found no critical or important code
+violation. It identified administrative checks for mobile `specialUse` and
+Wear `health|specialUse` foreground-service declarations, and confirmed the
+Health Connect/heart-rate path is permission-gated and disclosed. These App
+content declarations must remain aligned in Play Console.
+
+## 0.1.9 broken-functionality fix release
+
+The previous `0.1.8` / `1000008` phone and `0.1.8` / `2000009` Wear releases
+were already present on all four Play tracks. Because Google Play version
+codes are immutable, the reliability fixes use the next release identity:
+`0.1.9`, phone/tablet code `1000009`, and Wear OS code `2000010`.
+
+The phone flow now prevents duplicate session actions, surfaces start and
+control failures, treats failed watch delivery as a real error, and falls back
+to a local phone-owned session when the watch transport is unavailable. The
+release was built from branch `codex/zhanzhuang-0.1.3-taiji-icon` at baseline
+`7a7971d`, plus the verified working-tree fixes.
+
+| Surface | Version code | Candidate | Bytes | SHA-256 |
+| --- | ---: | --- | ---: | --- |
+| Phones/tablets | `1000009` | `mobile/build/outputs/bundle/release/mobile-release.aab` | `10722636` | `7047ae52147e1132f3e5c8c17523614bdc24aef18cf1bbc26c1cbadb50ccbc7d` |
+| Wear OS | `2000010` | `wear/build/outputs/bundle/release/wear-release.aab` | `10218555` | `c07cdeceac9dea9f0323ee3f2b7bf8492a9a983d4cea85572442014309ebf8af` |
+
+The signed release verifier passed tests, release lint, metadata and asset
+contracts, strict AAB integrity checks, the approved upload certificate, and
+bundle identity checks. The mobile binary-only lane and Wear lane skipped
+listing metadata, images, screenshots, and changelogs during upload. Android
+Publisher readback after upload and promotion returned:
+
+- `internal|0.1.9|completed|1000009`
+- `production|0.1.9|completed|1000009`
+- `wear:internal|0.1.9|completed|2000010`
+- `wear:production|0.1.9|completed|2000010`
+
+On 2026-08-14, Play Console Publishing overview showed 15 changes not yet
+submitted for review, including both `0.1.9` full-rollout changes. The
+submission was confirmed in the UI; the overview now shows **Changes in
+review** for `Production` and `Production (Wear OS)`. Play's pre-review checks
+were still running at the time of submission.
+
+On 2026-08-16, Codex Browser reconfirmed the same account and the Publishing
+overview still showed **Changes in review** for both `0.1.9` production changes.
+
+No physical phone or Pixel Watch target was connected during this release;
+Play delivery does not substitute for the outstanding physical runtime matrix.
 
 ## 0.1.8 E interval timer release candidate
 

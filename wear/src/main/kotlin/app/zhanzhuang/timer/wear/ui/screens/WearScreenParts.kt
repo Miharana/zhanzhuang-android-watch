@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.wear.compose.material3.Text
@@ -30,7 +31,7 @@ import androidx.wear.compose.material3.MaterialTheme
 internal val RoundScreenHorizontalPadding = 18.dp
 internal val RoundActionHorizontalInset = 41.dp
 internal val RoundStepperHorizontalInset = 28.dp
-internal val RoundShortcutTopSafeSpace = 32.dp
+internal val RoundShortcutTopSafeSpace = 64.dp
 internal val RoundActionBottomSafeSpace = 64.dp
 
 /** Geometry behind the 454px round Wear target used for release screenshots and interaction layout. */
@@ -79,7 +80,15 @@ internal fun GoldAction(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = colors.onPrimary, fontWeight = FontWeight.Bold)
+        Text(
+            label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            color = colors.onPrimary,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -97,6 +106,13 @@ internal fun SoilAction(label: String, contentDescription: String = label, onCli
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = colors.onSurface)
+        Text(
+            label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            color = colors.onSurface,
+            textAlign = TextAlign.Center,
+        )
     }
 }

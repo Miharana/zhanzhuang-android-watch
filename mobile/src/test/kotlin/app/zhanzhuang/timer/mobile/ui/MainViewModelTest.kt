@@ -4,6 +4,7 @@ import app.zhanzhuang.timer.mobile.data.MobileRuntimeSnapshot
 import app.zhanzhuang.timer.mobile.data.SessionRepository
 import app.zhanzhuang.timer.mobile.health.HealthAvailability
 import app.zhanzhuang.timer.mobile.health.HealthConnectGateway
+import app.zhanzhuang.timer.mobile.health.HealthExportConsent
 import app.zhanzhuang.timer.mobile.health.HealthPermissionState
 import app.zhanzhuang.timer.mobile.health.HealthWriteResult
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiState
@@ -18,6 +19,9 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +47,8 @@ class MainViewModelTest {
     @Test
     fun healthPermissionRequestOnlyEmitsAfterExplicitSettingsAction() = runTest(dispatcher) {
         val permission = FakePermission()
-        val model = model(permission = permission)
+        val consent = FakeConsent()
+        val model = model(permission = permission, consent = consent)
         advanceUntilIdle()
 
         val request = async { model.permissionRequests.first() }
@@ -52,6 +57,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(FakeGateway.permissions, request.await())
+        assertTrue(consent.consentAccepted)
     }
 
     @Test
@@ -106,6 +112,42 @@ class MainViewModelTest {
     }
 
     @Test
+    fun startIgnoresDuplicateTapWhileTheFirstStartIsInFlight() = runTest(dispatcher) {
+        val actions = BlockingStartActions()
+        val model = model(actions = actions)
+        advanceUntilIdle()
+
+        model.start()
+        testScheduler.runCurrent()
+        model.start()
+        testScheduler.runCurrent()
+
+        assertTrue(model.state.value.training.actionInProgress)
+        assertEquals(1, actions.calls)
+
+        actions.release.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(model.state.value.training.actionInProgress)
+        assertEquals(1, actions.calls)
+        assertEquals(SessionStatus.RUNNING, model.state.value.training.session?.status)
+    }
+
+    @Test
+    fun failedStartIsReportedAndCanBeRetried() = runTest(dispatcher) {
+        val actions = FailingStartActions()
+        val model = model(actions = actions)
+        advanceUntilIdle()
+
+        model.start()
+        advanceUntilIdle()
+
+        assertFalse(model.state.value.training.actionInProgress)
+        assertEquals(TrainingActionError.START_FAILED, model.state.value.training.actionError)
+        assertEquals(1, actions.calls)
+    }
+
+    @Test
     fun reconnectRuntimeCatchesUpAndTerminalRepositoryStateSupersedesTheEphemeralCountdown() = runTest(dispatcher) {
         val runtime = MutableStateFlow<SessionRuntime?>(null)
         val repository = FakeRepository(listOf(watchRecord()))
@@ -130,6 +172,7 @@ class MainViewModelTest {
     private fun model(
         bridge: StateFlow<MobileSessionUiState> = MutableStateFlow(MobileSessionUiState()),
         permission: FakePermission = FakePermission(),
+        consent: FakeConsent = FakeConsent(),
         repository: FakeRepository = FakeRepository(),
         runtime: MutableStateFlow<SessionRuntime?> = MutableStateFlow(null),
         actions: MobileTrainingActions = FakeActions(),
@@ -143,6 +186,7 @@ class MainViewModelTest {
         wearRuntime = FakeWearRuntime(runtime),
         healthGateway = FakeGateway(),
         healthPermission = permission,
+        healthExportConsent = consent,
         reconcileHealth = {},
         now = { Instant.parse("2026-08-01T12:00:00Z") },
         zoneId = { ZoneId.of("Europe/London") },
@@ -192,8 +236,41 @@ class MainViewModelTest {
         override suspend fun finish(record: SessionRecord, cancelled: Boolean) = Unit
     }
 
+    private class BlockingStartActions : MobileTrainingActions {
+        val release = CompletableDeferred<Unit>()
+        var calls = 0
+
+        override suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord {
+            calls += 1
+            release.await()
+            return SessionRecord(config = config, status = SessionStatus.RUNNING)
+        }
+
+        override suspend fun pause(record: SessionRecord) = Unit
+        override suspend fun resume(record: SessionRecord) = Unit
+        override suspend fun finish(record: SessionRecord, cancelled: Boolean) = Unit
+    }
+
+    private class FailingStartActions : MobileTrainingActions {
+        var calls = 0
+
+        override suspend fun start(config: SessionConfig, watchReachable: Boolean): SessionRecord {
+            calls += 1
+            error("start failed")
+        }
+
+        override suspend fun pause(record: SessionRecord) = Unit
+        override suspend fun resume(record: SessionRecord) = Unit
+        override suspend fun finish(record: SessionRecord, cancelled: Boolean) = Unit
+    }
+
     private class FakePermission : HealthPermissionPort {
         override suspend fun state(required: Set<String>): HealthPermissionState = HealthPermissionState.Missing(required)
+    }
+
+    private class FakeConsent(var consentAccepted: Boolean = false) : HealthExportConsent {
+        override fun isAccepted(): Boolean = consentAccepted
+        override fun accept() { consentAccepted = true }
     }
 
     private class FakeGateway : HealthConnectGateway {

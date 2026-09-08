@@ -1,0 +1,1 @@
+Adds an explicit Health Connect export disclosure and consent gate before permission requests or background writes.

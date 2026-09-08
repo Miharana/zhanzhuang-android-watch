@@ -9,7 +9,7 @@ import app.zhanzhuang.timer.wear.ui.screens.RoundScreenGeometry
 class WearStoreScreenContractTest {
     @Test fun startActionPrecedesOptionalDurationShortcuts() {
         val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
-        assertTrue(setup.indexOf("GoldAction(stringResource(R.string.start_session)") < setup.indexOf("Text(stringResource(R.string.shortcuts)"))
+        assertTrue(setup.indexOf("stringResource(R.string.start_session)") < setup.indexOf("stringResource(R.string.shortcuts)"))
     }
 
     @Test fun setupUsesTheRoundScreenForSessionControlsNotDuplicateBranding() {
@@ -84,6 +84,23 @@ class WearStoreScreenContractTest {
         val setup = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/SetupScreen.kt").readText()
 
         assertTrue(setup.contains("RoundShortcutTopSafeSpace"))
+        assertTrue(File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/WearScreenParts.kt").readText().contains("RoundShortcutTopSafeSpace = 64.dp"))
+    }
+
+    @Test fun sharedActionsGiveDefaultFontTextHorizontalRoom() {
+        val parts = File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/WearScreenParts.kt").readText()
+        assertTrue(parts.contains("padding(horizontal = 14.dp, vertical = 4.dp)"))
+        assertTrue(parts.contains("textAlign = TextAlign.Center"))
+    }
+
+    @Test fun allWearScreenTextPathsUseRoundSafeHorizontalPadding() {
+        val files = listOf("SetupScreen.kt", "PermissionScreen.kt", "ActiveSessionScreen.kt", "CompletionScreen.kt")
+            .map { File("src/main/kotlin/app/zhanzhuang/timer/wear/ui/screens/$it").readText() }
+        files.forEach { source ->
+            assertTrue(source.contains("RoundScreenHorizontalPadding"))
+            assertTrue(source.contains("transformedHeight("))
+            assertTrue(source.contains("textAlign = TextAlign.Center"))
+        }
     }
 
     @Test fun roundSafeActionBoundsFitInsideThe454pxWatchCircle() {

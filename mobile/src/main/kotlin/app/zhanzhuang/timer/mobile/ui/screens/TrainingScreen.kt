@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import app.zhanzhuang.timer.R
 import app.zhanzhuang.timer.mobile.ui.components.EBrandMark
 import app.zhanzhuang.timer.mobile.ui.components.EIntervalTimer
+import app.zhanzhuang.timer.mobile.ui.TrainingActionError
 import app.zhanzhuang.timer.mobile.ui.TrainingUiState
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionStatus
@@ -79,6 +80,15 @@ fun TrainingScreen(
                 }
             }
             HorizontalDivider()
+            state.actionError?.let { error ->
+                Text(
+                    when (error) {
+                        TrainingActionError.START_FAILED -> stringResource(R.string.session_start_failed)
+                        TrainingActionError.UPDATE_FAILED -> stringResource(R.string.session_action_failed)
+                    },
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             when {
                 active -> ActiveTraining(state, onPause, onResume, onFinish, onCancel)
                 state.session?.status in TERMINAL_STATUSES -> {
@@ -92,12 +102,18 @@ fun TrainingScreen(
         if (!active) {
             Button(
                 onClick = onStart,
+                enabled = !state.actionInProgress,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
                     .heightIn(min = 52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-            ) { Text(stringResource(R.string.start_standing), fontWeight = FontWeight.Bold) }
+            ) {
+                Text(
+                    stringResource(if (state.actionInProgress) R.string.starting_session else R.string.start_standing),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
@@ -165,9 +181,9 @@ private fun ActiveTraining(
         Text(stringResource(R.string.watch_owns_timer), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     WatchStatus(state)
-    if (paused) Button(onClick = onResume, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.resume_session)) }
-    else OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.pause_session)) }
-    OutlinedButton(onClick = { confirmingEnd = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.end_session)) }
+    if (paused) Button(onClick = onResume, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.resume_session)) }
+    else OutlinedButton(onClick = onPause, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.pause_session)) }
+    OutlinedButton(onClick = { confirmingEnd = true }, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.end_session)) }
     if (confirmingEnd) AlertDialog(
         onDismissRequest = { confirmingEnd = false },
         title = { Text(stringResource(R.string.end_session_question)) },

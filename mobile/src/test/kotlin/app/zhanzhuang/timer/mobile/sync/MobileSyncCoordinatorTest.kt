@@ -43,6 +43,19 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun failedInitialWatchDeliveryFallsBackToThePhoneImmediately() = runTest {
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false)))
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+
+        val started = coordinator.startFromMobile(SessionConfig())
+
+        assertEquals(SessionOwner.MOBILE, started.owner)
+        assertEquals(SessionStatus.RUNNING, started.status)
+        assertEquals(listOf("START"), transport.sentPayloadNames)
+    }
+
+    @Test
     fun duplicateAndExpiredStartAreSafelyRejected() = runTest {
         val controller = FakeController()
         val coordinator = MobileSyncCoordinator(

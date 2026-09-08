@@ -1,16 +1,95 @@
 # Pixel Watch 4 physical QA results
 
-Last updated: 2026-08-09
+Last updated: 2026-08-31
 
-## 0.1.8 candidate boundary
+## Current 0.1.11 mobile + 0.1.12 Wear broken-functionality fix candidate
 
-The next candidate is `0.1.8` / `1000008` (phone) and `0.1.8` / `2000009`
-(Wear). Automated checks cover its E timer resource, reminder-interval progress
-math, round-safe Wear layout build, and phone-side discovery of a watch session
-that began before the phone app opened. Physical Pixel Watch 4 and paired Data
-Layer verification remain **not run** until an authorized phone/watch ADB
-connection is available; no emulator or source check is treated as a physical
-pass.
+Google Play rejected Wear `2000012` / `0.1.11` on 2026-08-30 after its review
+device showed the system “Zhan Zhuang keeps stopping” dialog immediately after
+launch. The review record does not expose a stack trace. The corrected Wear
+candidate is `2000013` / `0.1.12`.
+
+The startup fix prevents a fresh install from starting the status-only health
+foreground service when no durable session exists. Active-session recovery
+still uses the foreground service, while terminal recovery uses a normal
+activity-bound service. The same guard covers boot recovery and stale service
+callers.
+
+The coordinated mobile candidate adds a prominent Health Connect export
+disclosure. The user must explicitly accept it before the app requests write
+permissions; the persisted acceptance and runtime permission are both checked
+before any background Health Connect write.
+
+The follow-up Play Policy Insights audit found no Critical or Important code
+compliance findings; its Health Connect findings were pruned after verifying
+the explicit acceptance gate. Play Console still shows only the existing
+foreground-service declaration as a routine manual-review reminder.
+
+Automated and installed verification passed: recovery-policy unit tests,
+Android/Wear unit tests, lint, debug and signed release builds, release
+manifest/resource/permission contracts, and signed AAB checks. On the API 36
+Wear emulator, clearing app data and launching signed `2000013` returned
+success, kept the process alive, started no `WearSessionService`, and produced
+no fatal/security exception or crash dialog. On the API 33 mobile emulator,
+clearing app data and launching debug `1000011` also returned success with
+the process alive and no crash output. This is emulator evidence only; physical
+Pixel Watch 4 launch and long-running health-service behavior remain not run.
+
+The uploaded phone AAB is `mobile/build/outputs/bundle/release/mobile-release.aab`
+(10,728,302 bytes; SHA-256
+`87c504798e77ed0ee4007f280ce14a9b8811ca284ce36e1145b79e2518ba85c1`).
+The uploaded Wear AAB is `wear/build/outputs/bundle/release/wear-release.aab`
+(10,280,590 bytes; SHA-256
+`4ab1218bd894ad5949f25cd5004448404d4c0db740c8fa08cb2f55141f248545`).
+Android Publisher readback confirms `1000011` on both phone `internal` and
+`production`, and `2000013` on both `wear:internal` and `wear:production`.
+
+Codex Browser is on the authorized `wangyal@urticad.com` account. Play
+Publishing overview submitted the 15 prepared changes after explicit owner
+confirmation, including phone `0.1.11` and Wear `0.1.12`; the page now shows
+**Changes in review**. Play's automated quick checks continue in the background.
+
+## Current 0.1.11 Wear policy resubmission candidate
+
+The current candidate is phone/tablet `0.1.10` / `1000010` and Wear OS
+`0.1.11` / `2000012`. Wear `2000011` was rejected on 2026-08-25 because the
+reviewer found no 48x48dp launcher icon on a black Wear startup screen. The
+code correction adds the AndroidX branded splash theme and a centered 48dp
+launcher icon matching the app identity.
+
+The signed Wear artifact used for the Play upload was
+`wear/build/outputs/bundle/release/wear-release.aab` (10,279,695 bytes;
+SHA-256 `7e23f3976502d703f5d97351761be3c839104d3d8dd40653073b60c58cc4dc75`).
+The signed mobile artifact is `mobile/build/outputs/bundle/release/mobile-release.aab`
+(10,723,057 bytes; SHA-256
+`1b2169b06041f4f71033f16af3a1af8734f7a0839c10fe1cf91856d31aa7b0a5`).
+The andship release lanes uploaded both candidates to their internal tracks
+and promoted them to production; sequential Publisher readback returned
+`1000010` for phone `internal`/`production` and `2000012` for Wear
+`wear:internal`/`wear:production`.
+
+On 2026-08-25, Codex Browser confirmed the authorized `wangyal@urticad.com`
+session under `Urticad Tech Ltd`. Submission `15` contains phone Production
+`0.1.10`, Wear Production `0.1.11`, and the related store/App content
+changes. It was manually confirmed in Play Console and is now **In review**.
+Policy status shows **Update in review**; no App content declaration needs
+attention. The old splash-icon rejection remains visible only as the prior
+policy record while Google reviews the new submission.
+
+The current candidate passed the signed release verifier, release lint, AAB
+manifest/resource checks, and Wear resource identity tests. This verifies the
+branded splash resource and launch theme in the signed bundle; it is not a
+claim of physical Pixel Watch 4 launch or runtime QA.
+
+## 0.1.9 candidate boundary
+
+The current Play candidate is `0.1.9` / `1000009` (phone) and `0.1.9` /
+`2000010` (Wear). Automated checks cover its E timer resource,
+reminder-interval progress math, round-safe Wear layout build, and phone-side
+discovery of a watch session that began before the phone app opened. Physical
+Pixel Watch 4 and paired Data Layer verification remain **not run** until an
+authorized phone/watch ADB connection is available; no emulator or source
+check is treated as a physical pass.
 
 Physical Pixel Watch 4 evidence for the current `0.1.6` internal build is
 **not run**. On 2026-08-06, `adb devices -l` returned only the local Android
@@ -55,11 +134,12 @@ mobile instrumentation tests for the 0.1.6 source successfully. This checks
 the phone debug variant only and does not prove the Play-signed build, physical
 launcher icon, companion delivery, or any watch behaviour.
 
-## Play-delivered build status
+## Historical 0.1.9 Play-delivered build status
 
-Play delivery is **ready for physical testing**. The phone internal track is
-active with `0.1.6` (`1000006`), and the Wear OS internal track is active with
-`0.1.6` (`2000007`); the shared tester list is enabled
+Play delivery is **complete for the four requested tracks and submitted for
+review**. The phone `internal` and `production` tracks both read
+back `0.1.9` (`1000009`), and the Wear OS `wear:internal` and
+`wear:production` tracks both read back `0.1.9` (`2000010`); the shared tester list is enabled
 on both tracks, and `scorpiocn@gmail.com` accepted the invitation. Google Play's
 install picker recognizes both the Google Pixel Watch 4 and Google Pixel 10
 Pro. After the 0.1.3 upload, the install picker selected Pixel Watch 4 and
@@ -72,9 +152,9 @@ install-soon confirmation for the phone. No installed version, launcher
 appearance, runtime, Health Connect, Data Layer, timing, haptic, or recovery
 result is inferred from either remote request, so the physical-device rows
 above remain `Not run` or `Blocked` until observed. Phone `0.1.4` and Wear
-`0.1.5` are on their respective production tracks with `completed` rollout
-status and are grouped under **Changes in review** in Play Console; this review
-state does not substitute for physical launcher or runtime evidence.
+`0.1.5` are historical production releases. The current phone and Wear `0.1.9`
+full-rollout changes are submitted for review; this review state does not
+substitute for physical launcher or runtime evidence.
 
 ## Current physical connectivity boundary
 

@@ -81,6 +81,26 @@ class ResourceIdentityContractTest {
         assertTrue(svg.contains("<linearGradient"))
     }
 
+    @Test fun brandedLaunchContractIsPresent() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        assertTrue(manifest.contains("android:theme=\"@style/Theme.ZhanZhuang.Starting\""))
+
+        val styles = resource("values/styles.xml").readText()
+        assertTrue(styles.contains("name=\"Theme.ZhanZhuang\""))
+        assertTrue(styles.contains("name=\"Theme.ZhanZhuang.Starting\" parent=\"Theme.SplashScreen\""))
+        assertTrue(styles.contains("windowSplashScreenBackground") && styles.contains("@android:color/black"))
+        assertTrue(styles.contains("windowSplashScreenAnimatedIcon") && styles.contains("@drawable/splash_screen"))
+        assertTrue(styles.contains("postSplashScreenTheme") && styles.contains("@style/Theme.ZhanZhuang"))
+
+        val dimensions = resource("values/dimens.xml").readText()
+        assertTrue(dimensions.contains("name=\"splash_screen_icon_size\">48dp"))
+        val splash = resource("drawable/splash_screen.xml").readText()
+        assertTrue(splash.contains("android:width=\"@dimen/splash_screen_icon_size\""))
+        assertTrue(splash.contains("android:height=\"@dimen/splash_screen_icon_size\""))
+        assertTrue(splash.contains("android:drawable=\"@mipmap/ic_launcher\""))
+        assertTrue(splash.contains("android:gravity=\"center\""))
+    }
+
     private fun keys(locale: String) = copy(locale).keys
 
     private fun placeholders(copy: Map<String, String>) = copy.mapValues { (_, value) ->

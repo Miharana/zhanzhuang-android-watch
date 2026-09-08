@@ -11,6 +11,7 @@ import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -26,6 +27,8 @@ interface MobileSyncController {
     suspend fun resumeFromRemote(sessionId: String): SessionRecord?
     suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord?
     suspend fun becomeMobileOwner(sessionId: String): SessionRecord?
+    /** Marks a reserved local start as interrupted when foreground promotion fails. */
+    suspend fun abandon(sessionId: String): Boolean = false
     suspend fun mergeRemote(record: SessionRecord): SessionRecord
 }
 
@@ -56,7 +59,16 @@ class MobileSyncCoordinator(
         val sessionId = UUID.randomUUID().toString()
         val record = controller.startFromMobile(config, sessionId, revision = 1)
         val start = envelope(record, SyncPayload.Start(config, nowEpochMillis() + START_EXPIRY_MS))
-        scope.launch { runCatching { transport.sendMessage(start) } }
+        val delivered = try {
+            transport.sendMessage(start)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+        if (!delivered) {
+            return@withLock fallbackToMobile(record)
+        }
         fallbackJobs.remove(record.id)?.cancel()
         fallbackJobs[record.id] = scope.launch {
             delay(ACK_TIMEOUT_MS)
@@ -76,13 +88,29 @@ class MobileSyncCoordinator(
     suspend fun startOnMobile(config: SessionConfig): SessionRecord = mutex.withLock {
         val sessionId = UUID.randomUUID().toString()
         controller.startFromMobile(config, sessionId, revision = 1)
-        return requireNotNull(controller.becomeMobileOwner(sessionId)) {
-            "The locally reserved session was not available for phone ownership"
-        }.also { started ->
-            check(started.id == sessionId && started.owner == SessionOwner.MOBILE) {
-                "Phone ownership changed the reserved session identity"
+        return try {
+            requireNotNull(controller.becomeMobileOwner(sessionId)) {
+                "The locally reserved session was not available for phone ownership"
+            }.also { started ->
+                check(started.id == sessionId && started.owner == SessionOwner.MOBILE) {
+                    "Phone ownership changed the reserved session identity"
+                }
             }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            controller.abandon(sessionId)
+            throw error
         }
+    }
+
+    private suspend fun fallbackToMobile(record: SessionRecord): SessionRecord = try {
+        requireNotNull(controller.becomeMobileOwner(record.id)) {
+            "The local fallback session was not available for phone ownership"
+        }
+    } catch (error: Exception) {
+        if (error is CancellationException) throw error
+        controller.abandon(record.id)
+        throw error
     }
 
     /**
