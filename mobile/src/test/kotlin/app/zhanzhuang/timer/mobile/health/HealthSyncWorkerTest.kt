@@ -60,6 +60,16 @@ class HealthSyncWorkerTest {
     }
 
     @Test
+    fun backgroundSyncSkipsBeforeDisclosureAcceptance() = runTest {
+        val gateway = FakeHealthGateway()
+
+        val outcome = worker(gateway, FakeConsent(accepted = false)).sync(completed())
+
+        assertIs<HealthSyncOutcome.Skipped>(outcome)
+        assertTrue(gateway.writes.isEmpty())
+    }
+
+    @Test
     fun missingWritePermissionDoesNotRetryOrWrite() = runTest {
         val gateway = FakeHealthGateway(result = HealthWriteResult.PermissionMissing(setOf("write:mindfulness")))
 
@@ -196,7 +206,13 @@ class HealthSyncWorkerTest {
         )
     }
 
-    private fun worker(gateway: HealthConnectGateway) = HealthSyncWorker(gateway)
+    private fun worker(gateway: HealthConnectGateway, consent: FakeConsent = FakeConsent(accepted = true)) =
+        HealthSyncWorker(gateway, consent)
+
+    private class FakeConsent(private var accepted: Boolean) : HealthExportConsent {
+        override fun isAccepted(): Boolean = accepted
+        override fun accept() { accepted = true }
+    }
 
     private fun completedWithSamples() = completed(
         samples = listOf(

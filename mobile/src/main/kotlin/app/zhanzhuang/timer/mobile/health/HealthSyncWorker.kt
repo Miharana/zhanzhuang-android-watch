@@ -28,8 +28,12 @@ sealed interface HealthSyncOutcome {
 
 class HealthSyncWorker(
     private val gateway: HealthConnectGateway,
+    private val exportConsent: HealthExportConsent,
 ) {
     suspend fun sync(record: SessionRecord): HealthSyncOutcome {
+        if (!exportConsent.isAccepted()) {
+            return HealthSyncOutcome.Skipped("Health Connect export disclosure was not accepted")
+        }
         if (record.status != SessionStatus.COMPLETED) {
             return HealthSyncOutcome.Skipped("Only completed sessions can be exported")
         }
@@ -51,6 +55,7 @@ class HealthSyncWorker(
     private fun HealthWriteResult.toOutcome(): HealthSyncOutcome = when (this) {
         is HealthWriteResult.Success -> HealthSyncOutcome.Synced(sessionWritten, heartRateWritten)
         is HealthWriteResult.PermissionMissing -> HealthSyncOutcome.PermissionMissing(permissions)
+        HealthWriteResult.ConsentMissing -> HealthSyncOutcome.Skipped("Health Connect export disclosure was not accepted")
         is HealthWriteResult.Unavailable -> HealthSyncOutcome.Unavailable(reason)
         is HealthWriteResult.Retryable -> HealthSyncOutcome.Retry
         is HealthWriteResult.PermanentFailure -> HealthSyncOutcome.Failed(reason)
@@ -89,6 +94,9 @@ class HealthSyncWorker(
             if (record.status != SessionStatus.COMPLETED || record.activeDurationMs < MIN_EXPORT_DURATION_MILLIS) {
                 return false
             }
+            // Preserve the pending record until the user explicitly accepts the
+            // disclosure. Reconciliation will enqueue it after acceptance.
+            if (!SharedPreferencesHealthExportConsent(context).isAccepted()) return true
             val request = OneTimeWorkRequestBuilder<HealthConnectExportWorker>()
                 .setInputData(Data.Builder().putString(SESSION_ID_INPUT_KEY, record.id).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
@@ -102,6 +110,7 @@ class HealthSyncWorker(
         }
 
         suspend fun reconcile(context: Context) {
+            if (!SharedPreferencesHealthExportConsent(context).isAccepted()) return
             val repository = HealthSyncWorkerDependencies.sessionRepository?.invoke(context) ?: return
             reconciliationCandidates(repository.pendingHealthSyncSessions()).forEach { enqueue(context, it) }
         }
@@ -123,7 +132,9 @@ class HealthConnectExportWorker(
         val repositoryFactory = HealthSyncWorkerDependencies.sessionRepository ?: return Result.failure()
         val repository = repositoryFactory(applicationContext)
         val record = repository.get(sessionId) ?: return Result.success()
-        val outcome = HealthSyncWorker(HealthSyncWorkerDependencies.gateway(applicationContext)).sync(record)
+        val consent = SharedPreferencesHealthExportConsent(applicationContext)
+        if (!consent.isAccepted()) return Result.success()
+        val outcome = HealthSyncWorker(HealthSyncWorkerDependencies.gateway(applicationContext), consent).sync(record)
         HealthSyncWorker.recordAfterOutcome(record, outcome)?.let { updated ->
             repository.upsert(updated)
         }

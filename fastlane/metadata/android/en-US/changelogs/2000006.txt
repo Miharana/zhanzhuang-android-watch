@@ -1,0 +1,1 @@
+Adds a Wear scroll indicator and round-screen-safe duration shortcuts.

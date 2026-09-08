@@ -18,4 +18,4 @@ Use default English and `zh-rCN` resources with exact key parity. Do not concate
 
 ## Launcher mark
 
-Both apps use adaptive, round, legacy foreground/background, and monochrome launcher assets. The mark is a centered standing gold pillar/figure on a deep-soil circle with exactly one four-point sparkle and no text. The 108 dp adaptive foreground preserves generous optical margins so the silhouette remains inside Android and round Wear masks.
+Both apps use adaptive, round, legacy foreground/background, and monochrome launcher assets. The mark is a centered standing gold figure holding one gold-and-soil taiji at chest height on a deep-soil circle, with exactly one four-point sparkle and no text. The hands meet the single taiji at its sides and stop above its lower edge; they must never create a second ball outline or ring. The 108 dp adaptive foreground preserves generous optical margins so the silhouette remains inside Android and round Wear masks.

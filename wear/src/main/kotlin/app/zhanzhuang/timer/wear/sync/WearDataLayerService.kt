@@ -5,6 +5,7 @@ import androidx.room.Room
 import app.zhanzhuang.timer.wear.data.WearDatabase
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.model.PATH_ACK
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_PHONE
 import app.zhanzhuang.timer.model.PATH_COMMAND
 import app.zhanzhuang.timer.model.PATH_COMPLETED
 import app.zhanzhuang.timer.model.PATH_STATE
@@ -58,6 +59,10 @@ class WearDataLayerService : com.google.android.gms.wearable.WearableListenerSer
     override fun onPeerConnected(peer: com.google.android.gms.wearable.Node) {
         super.onPeerConnected(peer)
         WearCompletionSyncWorker.enqueue(applicationContext)
+        scope.launch {
+            runCatching { WearSyncRuntime.get(applicationContext).resendCompleted() }
+            runCatching { WearSyncRuntime.get(applicationContext).publishCurrentState(peer.id) }
+        }
     }
 
     override fun onMessageReceived(event: MessageEvent) {
@@ -98,7 +103,7 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
             else -> PATH_COMMAND
         }
         val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
-            .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_REACHABLE)
+            .getCapability(CAPABILITY_ZHAN_ZHUANG_PHONE, CapabilityClient.FILTER_REACHABLE)
             .await()
             .nodes } ?: return false
         return nodes.map { node ->
@@ -127,5 +132,5 @@ class WearAndroidDataLayerTransport(context: Context) : SyncTransport {
         return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getDataClient(appContext).putDataItem(request).await() } != null }.getOrDefault(false)
     }
 
-    private companion object { const val CAPABILITY_NAME = "zhan_zhang_sync"; const val TRANSPORT_TIMEOUT_MS = 4_000L }
+    private companion object { const val TRANSPORT_TIMEOUT_MS = 4_000L }
 }

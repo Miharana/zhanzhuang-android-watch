@@ -3,6 +3,7 @@ package app.zhanzhuang.timer.mobile.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,6 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import app.zhanzhuang.timer.R
+import app.zhanzhuang.timer.mobile.ui.components.EBrandMark
+import app.zhanzhuang.timer.mobile.ui.components.EIntervalTimer
+import app.zhanzhuang.timer.mobile.ui.TrainingActionError
 import app.zhanzhuang.timer.mobile.ui.TrainingUiState
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionStatus
@@ -55,23 +59,62 @@ fun TrainingScreen(
 ) {
     val active = state.session?.status in ACTIVE_STATUSES
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxSize(),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text(stringResource(R.string.brand_chinese), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.standing_meditation), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EBrandMark(description = stringResource(R.string.app_name))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(stringResource(R.string.history), onHistory)
+                    TextButton(stringResource(R.string.settings), onSettings)
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(stringResource(R.string.history), onHistory)
-                TextButton(stringResource(R.string.settings), onSettings)
+            HorizontalDivider()
+            state.actionError?.let { error ->
+                Text(
+                    when (error) {
+                        TrainingActionError.START_FAILED -> stringResource(R.string.session_start_failed)
+                        TrainingActionError.UPDATE_FAILED -> stringResource(R.string.session_action_failed)
+                    },
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            when {
+                active -> ActiveTraining(state, onPause, onResume, onFinish, onCancel)
+                state.session?.status in TERMINAL_STATUSES -> {
+                    TerminalTraining(state)
+                    HorizontalDivider()
+                    SetupTraining(state, onDurationChange, onIntervalChange)
+                }
+                else -> SetupTraining(state, onDurationChange, onIntervalChange)
             }
         }
-        HorizontalDivider()
-        if (active) ActiveTraining(state, onPause, onResume, onFinish, onCancel)
-        else if (state.session?.status in TERMINAL_STATUSES) TerminalTraining(state)
-        else SetupTraining(state, onDurationChange, onIntervalChange, onStart)
+        if (!active) {
+            Button(
+                onClick = onStart,
+                enabled = !state.actionInProgress,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+            ) {
+                Text(
+                    stringResource(if (state.actionInProgress) R.string.starting_session else R.string.start_standing),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
@@ -96,7 +139,6 @@ private fun SetupTraining(
     state: TrainingUiState,
     onDurationChange: (Int) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onStart: () -> Unit,
 ) {
     Text(stringResource(R.string.duration), style = MaterialTheme.typography.titleLarge)
     Stepper(
@@ -110,11 +152,6 @@ private fun SetupTraining(
     ChoiceFlow(intervals, state.config.intervalMinutes, { stringResource(R.string.every_minutes, it) }, onIntervalChange)
     Text(stringResource(R.string.haptic_explanation), color = MaterialTheme.colorScheme.onSurfaceVariant)
     WatchStatus(state)
-    Button(
-        onClick = onStart,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-    ) { Text(stringResource(R.string.start_standing), fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -129,6 +166,12 @@ private fun ActiveTraining(
     val paused = state.session?.status == SessionStatus.PAUSED
     val remainingDescription = stringResource(R.string.seconds_remaining, state.remainingMs / 1_000L)
     Text(if (paused) stringResource(R.string.paused) else if (state.session?.owner == SessionOwner.WEAR) stringResource(R.string.standing_on_watch) else stringResource(R.string.standing), style = MaterialTheme.typography.titleLarge)
+    EIntervalTimer(
+        activeElapsedMs = state.activeElapsedMs,
+        config = state.session?.config ?: state.config,
+        description = remainingDescription,
+        modifier = Modifier.padding(horizontal = 24.dp),
+    )
     Text(
         formatDuration(state.remainingMs),
         style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace),
@@ -138,9 +181,9 @@ private fun ActiveTraining(
         Text(stringResource(R.string.watch_owns_timer), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     WatchStatus(state)
-    if (paused) Button(onClick = onResume, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.resume_session)) }
-    else OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.pause_session)) }
-    OutlinedButton(onClick = { confirmingEnd = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.end_session)) }
+    if (paused) Button(onClick = onResume, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.resume_session)) }
+    else OutlinedButton(onClick = onPause, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.pause_session)) }
+    OutlinedButton(onClick = { confirmingEnd = true }, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.end_session)) }
     if (confirmingEnd) AlertDialog(
         onDismissRequest = { confirmingEnd = false },
         title = { Text(stringResource(R.string.end_session_question)) },

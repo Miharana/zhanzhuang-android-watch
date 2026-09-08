@@ -3,9 +3,13 @@ package app.zhanzhuang.timer.wear.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
@@ -35,6 +39,7 @@ class WearScreensTest {
     @Test fun endRequiresConfirmation() {
         rule.setContent { ZhanZhuangWearTheme { ActiveSessionScreen(runningState(), {}, {}, {}) } }
 
+        scrollToActions()
         rule.onNodeWithContentDescription("End session").performClick()
         rule.onNodeWithText("End this session?").assertIsDisplayed()
     }
@@ -45,6 +50,7 @@ class WearScreensTest {
             ZhanZhuangWearTheme { ActiveSessionScreen(runningState(), {}, {}, {}, onCancel = { cancelled = true }) }
         }
 
+        scrollToActions()
         rule.onNodeWithContentDescription("End session").performClick()
         rule.onNodeWithContentDescription("Cancel session").performClick()
 
@@ -72,4 +78,11 @@ class WearScreensTest {
         currentHeartRateBpm = null,
         nextReminderAtActiveMs = null,
     )
+
+    private fun scrollToActions() {
+        repeat(2) { rule.onRoot().performTouchInput { swipeUp() } }
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithContentDescription("End session").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 }

@@ -1,1 +1,9 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#FFFFFFFF" android:pathData="M50,27L58,27L60,43L67,55L64,81L44,81L41,55L48,43Z"/><path android:fillColor="#FFFFFFFF" android:pathData="M76,23L78,29L84,31L78,33L76,39L74,33L68,31L74,29Z"/></vector>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:name="e_outer_rim" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M54,10A44,44 0,1 0,54,98A44,44 0,1 0,54,10"/>
+    <group android:name="e_taiji">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M54,24A14,14 0,1 1,54,52A14,14 0,1 1,54,24"/>
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:pathData="M54,24A14,14 0,0 1,54,52A7,7 0,0 1,54,38A7,7 0,0 0,54,24Z"/>
+    </group>
+    <path android:name="e_lower_left_ring" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:pathData="M39.9,58.9A7.9,7.9 0,1 0,39.9,74.7A7.9,7.9 0,1 0,39.9,58.9"/>
+    <path android:name="e_lower_right_ring" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:pathData="M68.1,58.9A7.9,7.9 0,1 0,68.1,74.7A7.9,7.9 0,1 0,68.1,58.9"/>
+</vector>

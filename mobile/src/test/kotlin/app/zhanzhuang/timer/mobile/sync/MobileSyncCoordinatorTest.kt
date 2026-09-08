@@ -43,6 +43,19 @@ class MobileSyncCoordinatorTest {
     }
 
     @Test
+    fun failedInitialWatchDeliveryFallsBackToThePhoneImmediately() = runTest {
+        val transport = FakeTransport(messageResults = ArrayDeque(listOf(false)))
+        val controller = FakeController()
+        val coordinator = MobileSyncCoordinator(transport, controller, this, nowEpochMillis = { 1_000L })
+
+        val started = coordinator.startFromMobile(SessionConfig())
+
+        assertEquals(SessionOwner.MOBILE, started.owner)
+        assertEquals(SessionStatus.RUNNING, started.status)
+        assertEquals(listOf("START"), transport.sentPayloadNames)
+    }
+
+    @Test
     fun duplicateAndExpiredStartAreSafelyRejected() = runTest {
         val controller = FakeController()
         val coordinator = MobileSyncCoordinator(
@@ -363,6 +376,19 @@ class MobileSyncCoordinatorTest {
         assertEquals(SessionOwner.WEAR, controller.owner())
     }
 
+    @Test
+    fun reconnectDiscoversAWearSessionEvenWhenPhoneHasNoLocalRecord() = runTest {
+        val transport = FakeTransport()
+        val coordinator = MobileSyncCoordinator(transport, EmptyController(), this, nowEpochMillis = { 20_000L })
+
+        assertTrue(coordinator.queryCurrentWearState())
+
+        val query = transport.envelopes.single()
+        assertEquals("QUERY_STATE", transport.sentPayloadNames.single())
+        assertEquals("wear-state-discovery", query.sessionId)
+        assertEquals(0, query.revision)
+    }
+
     private fun envelope(eventId: String, revision: Long, payload: SyncPayload) = SyncEnvelope(
         eventId = eventId,
         sessionId = "session-1",
@@ -438,6 +464,18 @@ class MobileSyncCoordinatorTest {
 
         fun owner(): SessionOwner = record.owner
         fun seed(record: SessionRecord) { this.record = record }
+    }
+
+    private class EmptyController : MobileSyncController {
+        override suspend fun startFromMobile(config: SessionConfig, sessionId: String, revision: Long): SessionRecord = error("not used")
+        override suspend fun startFromRemote(config: SessionConfig, sessionId: String, revision: Long): SessionRecord = error("not used")
+        override suspend fun current(): SessionRecord? = null
+        override suspend fun session(sessionId: String): SessionRecord? = null
+        override suspend fun pauseFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun resumeFromRemote(sessionId: String): SessionRecord? = null
+        override suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord? = null
+        override suspend fun becomeMobileOwner(sessionId: String): SessionRecord? = null
+        override suspend fun mergeRemote(record: SessionRecord): SessionRecord = record
     }
 
     private companion object {

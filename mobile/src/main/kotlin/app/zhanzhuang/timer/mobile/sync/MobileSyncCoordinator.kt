@@ -11,6 +11,7 @@ import app.zhanzhuang.timer.model.SyncPayload
 import app.zhanzhuang.timer.model.SyncTransport
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -26,6 +27,8 @@ interface MobileSyncController {
     suspend fun resumeFromRemote(sessionId: String): SessionRecord?
     suspend fun finishFromRemote(sessionId: String, cancelled: Boolean): SessionRecord?
     suspend fun becomeMobileOwner(sessionId: String): SessionRecord?
+    /** Marks a reserved local start as interrupted when foreground promotion fails. */
+    suspend fun abandon(sessionId: String): Boolean = false
     suspend fun mergeRemote(record: SessionRecord): SessionRecord
 }
 
@@ -56,7 +59,16 @@ class MobileSyncCoordinator(
         val sessionId = UUID.randomUUID().toString()
         val record = controller.startFromMobile(config, sessionId, revision = 1)
         val start = envelope(record, SyncPayload.Start(config, nowEpochMillis() + START_EXPIRY_MS))
-        scope.launch { runCatching { transport.sendMessage(start) } }
+        val delivered = try {
+            transport.sendMessage(start)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+        if (!delivered) {
+            return@withLock fallbackToMobile(record)
+        }
         fallbackJobs.remove(record.id)?.cancel()
         fallbackJobs[record.id] = scope.launch {
             delay(ACK_TIMEOUT_MS)
@@ -76,23 +88,48 @@ class MobileSyncCoordinator(
     suspend fun startOnMobile(config: SessionConfig): SessionRecord = mutex.withLock {
         val sessionId = UUID.randomUUID().toString()
         controller.startFromMobile(config, sessionId, revision = 1)
-        return requireNotNull(controller.becomeMobileOwner(sessionId)) {
-            "The locally reserved session was not available for phone ownership"
-        }.also { started ->
-            check(started.id == sessionId && started.owner == SessionOwner.MOBILE) {
-                "Phone ownership changed the reserved session identity"
+        return try {
+            requireNotNull(controller.becomeMobileOwner(sessionId)) {
+                "The locally reserved session was not available for phone ownership"
+            }.also { started ->
+                check(started.id == sessionId && started.owner == SessionOwner.MOBILE) {
+                    "Phone ownership changed the reserved session identity"
+                }
             }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            controller.abandon(sessionId)
+            throw error
         }
+    }
+
+    private suspend fun fallbackToMobile(record: SessionRecord): SessionRecord = try {
+        requireNotNull(controller.becomeMobileOwner(record.id)) {
+            "The local fallback session was not available for phone ownership"
+        }
+    } catch (error: Exception) {
+        if (error is CancellationException) throw error
+        controller.abandon(record.id)
+        throw error
     }
 
     /**
      * A reachable companion has returned. Ask it for the durable state of an
      * already watch-owned session; this never starts a foreground service.
+     *
+     * The phone may have been closed when the watch began a session, so there
+     * may be no local Wear record yet. In that case a neutral discovery
+     * envelope lets the watch return its actual durable record.
      */
     suspend fun queryCurrentWearState(): Boolean = mutex.withLock {
         val current = controller.current()
             ?.takeIf { it.owner == SessionOwner.WEAR && it.status in ACTIVE_STATUSES }
-            ?: return false
+            ?: SessionRecord(
+                id = WATCH_STATE_DISCOVERY_SESSION_ID,
+                revision = 0,
+                status = SessionStatus.IDLE,
+                owner = SessionOwner.MOBILE,
+            )
         transport.sendMessage(envelope(current, SyncPayload.QueryState))
     }
 
@@ -257,6 +294,7 @@ class MobileSyncCoordinator(
         const val QUERY_TIMEOUT_MS = 5_000L
         const val START_EXPIRY_MS = ACK_TIMEOUT_MS + QUERY_TIMEOUT_MS
         const val MAX_SEEN_EVENTS = 512
+        const val WATCH_STATE_DISCOVERY_SESSION_ID = "wear-state-discovery"
         val ACTIVE_STATUSES = setOf(SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.PAUSED, SessionStatus.COMPLETING)
         val TERMINAL_STATUSES = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.INTERRUPTED)
     }

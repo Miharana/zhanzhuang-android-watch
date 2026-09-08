@@ -1,0 +1,1 @@
+Fixes session-start and watch-control failures with visible feedback and reliable phone fallback.

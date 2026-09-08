@@ -12,10 +12,33 @@ import kotlin.test.assertIs
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WearUiServiceContractTest {
+    @Test fun activeServicePublishesDurableStateBeforeRuntimeUpdates() {
+        val source = File("src/main/kotlin/app/zhanzhuang/timer/wear/session/WearSessionService.kt").readText()
+        val runtimePublisher = source
+            .substringAfter("private fun scheduleRuntimePublish")
+            .substringBefore("private suspend fun publishTerminalState")
+        val statePublish = runtimePublisher.indexOf("publishState(record)")
+        val runtimePublish = runtimePublisher.indexOf("publishRuntime(runtime)")
+
+        assertTrue(statePublish >= 0, "A watch-local start must announce its durable state to the phone")
+        assertTrue(runtimePublish > statePublish, "Runtime updates must follow the authoritative session state")
+    }
+
+    @Test fun manifestDeclaresPermissionSafeForegroundTypes() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+
+        assertTrue(manifest.contains("android.permission.FOREGROUND_SERVICE_SPECIAL_USE"))
+        assertTrue(manifest.contains("android:foregroundServiceType=\"health|specialUse\""))
+        assertTrue(manifest.contains("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"))
+        assertTrue(manifest.contains("android:value=\"standing_meditation_timer\""))
+    }
+
     @Test fun explicitSetupStartUsesTheServiceStartContract() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val intent = WearSessionService.startIntent(context, SessionConfig(45, 15), "ui-session")

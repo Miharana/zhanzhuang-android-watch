@@ -6,6 +6,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SyncProtocolTest {
+    @Test fun capabilitiesDistinguishPhoneAndWatchNodes() {
+        assertEquals("zhan_zhang_phone_sync", CAPABILITY_ZHAN_ZHUANG_PHONE)
+        assertEquals("zhan_zhang_wear_sync", CAPABILITY_ZHAN_ZHUANG_WEAR)
+    }
+
     @Test
     fun completedRecordRoundTripsThroughGzipOutboxPayload() {
         val envelope = SyncEnvelope(

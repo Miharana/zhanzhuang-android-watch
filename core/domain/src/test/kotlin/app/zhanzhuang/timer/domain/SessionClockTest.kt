@@ -23,4 +23,14 @@ class SessionClockTest {
         assertEquals(1_200_000, snapshot.activeElapsedMs)
         assertEquals(2, snapshot.dueReminderIndex)
     }
+
+    @Test
+    fun intervalProgressCompletesOneGoldRingPerConfiguredInterval() {
+        val config = SessionConfig(durationMinutes = 30, intervalMinutes = 10)
+
+        assertEquals(0f, intervalProgress(activeElapsedMs = 0, config = config))
+        assertEquals(0.5f, intervalProgress(activeElapsedMs = 5 * 60_000L, config = config))
+        assertEquals(0f, intervalProgress(activeElapsedMs = 10 * 60_000L, config = config))
+        assertEquals(0.25f, intervalProgress(activeElapsedMs = 12 * 60_000L + 30_000L, config = config))
+    }
 }

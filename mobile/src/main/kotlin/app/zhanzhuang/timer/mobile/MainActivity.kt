@@ -1,17 +1,25 @@
 package app.zhanzhuang.timer.mobile
 
 import android.animation.ValueAnimator
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,6 +39,7 @@ import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
 import app.zhanzhuang.timer.mobile.health.AndroidHealthConnectGateway
 import app.zhanzhuang.timer.mobile.health.HealthPermissionState
 import app.zhanzhuang.timer.mobile.health.HealthSyncWorker
+import app.zhanzhuang.timer.mobile.health.SharedPreferencesHealthExportConsent
 import app.zhanzhuang.timer.mobile.session.MobileSessionService
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiBridge
 import app.zhanzhuang.timer.mobile.sync.MobileSyncCoordinator
@@ -51,8 +60,10 @@ import app.zhanzhuang.timer.mobile.ui.screens.SettingsScreen
 import app.zhanzhuang.timer.mobile.ui.screens.TrainingScreen
 import app.zhanzhuang.timer.mobile.ui.theme.ZhanZhuangTheme
 import app.zhanzhuang.timer.model.SessionConfig
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_WEAR
 import app.zhanzhuang.timer.model.SessionOwner
 import app.zhanzhuang.timer.model.SessionRecord
+import app.zhanzhuang.timer.model.shouldRequestNotificationPermission
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.Wearable
@@ -64,13 +75,18 @@ import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
+    private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        viewModel.start()
+    }
     private val requestHealthPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         viewModel.onHealthPermissionResult()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         viewModel = ViewModelProvider(this, MainViewModelFactory(applicationContext))[MainViewModel::class.java]
         setContent {
             ZhanZhuangTheme {
@@ -92,6 +108,7 @@ class MainActivity : ComponentActivity() {
         Box(
             Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             when (state.destination) {
@@ -99,7 +116,7 @@ class MainActivity : ComponentActivity() {
                     state = state.training,
                     onDurationChange = model::selectDuration,
                     onIntervalChange = model::selectInterval,
-                    onStart = model::start,
+                    onStart = ::startWithNotificationPermission,
                     onPause = model::pause,
                     onResume = model::resume,
                     onFinish = { model.finish(cancelled = false) },
@@ -119,12 +136,21 @@ class MainActivity : ComponentActivity() {
                     health = state.health,
                     onDurationChange = model::selectDuration,
                     onIntervalChange = model::selectInterval,
-                    onRequestHealthPermission = model::requestHealthPermissions,
+                    onAcceptHealthDisclosure = model::requestHealthPermissions,
                     onRetryHealth = model::retryHealthSync,
                     onBack = { model.open(MobileDestination.TRAINING) },
                 )
             }
             GoldSparkle(enabled = sparkle && motionAllowed, onFinished = { sparkle = false })
+        }
+    }
+
+    private fun startWithNotificationPermission() {
+        val granted = Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (shouldRequestNotificationPermission(Build.VERSION.SDK_INT, granted)) {
+            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.start()
         }
     }
 }
@@ -137,7 +163,8 @@ private class MainViewModelFactory(private val context: Context) : ViewModelProv
                 .addMigrations(MobileDatabase.MIGRATION_1_2)
                 .build(),
         )
-        val gateway = AndroidHealthConnectGateway(context)
+        val healthConsent = SharedPreferencesHealthExportConsent(context)
+        val gateway = AndroidHealthConnectGateway(context, healthConsent)
         val coordinator = MobileSyncRuntime.get(context)
         return MainViewModel(
             repository = repository,
@@ -148,6 +175,7 @@ private class MainViewModelFactory(private val context: Context) : ViewModelProv
             wearRuntime = object : WearRuntimePort { override val states = MobileWearRuntimeBridge.runtime },
             healthGateway = gateway,
             healthPermission = AndroidHealthPermissionPort(context),
+            healthExportConsent = healthConsent,
             reconcileHealth = { HealthSyncWorker.reconcile(context) },
         ) as T
     }
@@ -163,17 +191,23 @@ private class AndroidTrainingActions(
         if (watchReachable) coordinator.startFromMobile(config) else coordinator.startOnMobile(config)
 
     override suspend fun pause(record: SessionRecord) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestPause(record.id)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestPause(record.id)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_PAUSE)
     }
 
     override suspend fun resume(record: SessionRecord) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestResume(record.id)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestResume(record.id)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_RESUME)
     }
 
     override suspend fun finish(record: SessionRecord, cancelled: Boolean) {
-        if (record.owner == SessionOwner.WEAR) coordinator.requestFinish(record.id, cancelled)
+        if (record.owner == SessionOwner.WEAR) {
+            check(coordinator.requestFinish(record.id, cancelled)) { "The watch could not be reached" }
+        }
         else MobileSessionService.command(context, MobileSessionService.ACTION_FINISH, cancelled)
     }
 }
@@ -210,13 +244,13 @@ private class AndroidWatchConnectionPort(
             if (reconnected) launch { runCatching { coordinator.queryCurrentWearState() } }
         }
         val listener = CapabilityClient.OnCapabilityChangedListener(::publish)
-        client.addListener(listener, CAPABILITY)
+        client.addListener(listener, CAPABILITY_ZHAN_ZHUANG_WEAR)
         launch {
-            runCatching { client.getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await() }
+            runCatching { client.getCapability(CAPABILITY_ZHAN_ZHUANG_WEAR, CapabilityClient.FILTER_REACHABLE).await() }
                 .getOrNull()
                 .let(::publish)
         }
-        awaitClose { client.removeListener(listener, CAPABILITY) }
+        awaitClose { client.removeListener(listener, CAPABILITY_ZHAN_ZHUANG_WEAR) }
     }.distinctUntilChanged()
 
     private fun CapabilityInfo.toConnection(): WatchConnectionState = WatchConnectionState(
@@ -224,5 +258,4 @@ private class AndroidWatchConnectionPort(
         name = nodes.firstOrNull()?.displayName,
     )
 
-    private companion object { const val CAPABILITY = "zhan_zhang_sync" }
 }

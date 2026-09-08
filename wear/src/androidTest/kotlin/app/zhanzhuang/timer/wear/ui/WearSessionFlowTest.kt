@@ -8,8 +8,11 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -31,7 +34,12 @@ class WearSessionFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Before fun denyHeartRateForDurationOnlyFlow() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.revokeRuntimePermission(
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.grantRuntimePermission(
+            "app.zhanzhuang.timer.debug",
+            Manifest.permission.POST_NOTIFICATIONS,
+        )
+        automation.revokeRuntimePermission(
             "app.zhanzhuang.timer.debug",
             Manifest.permission.BODY_SENSORS,
         )
@@ -54,10 +62,18 @@ class WearSessionFlowTest {
         }
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Standing").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Standing").assertIsDisplayed()
+        repeat(2) { rule.onRoot().performTouchInput { swipeUp() } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithContentDescription("Pause").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription("Pause").performTouchInput { click(center) }
+        repeat(2) { rule.onRoot().performTouchInput { swipeDown() } }
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Paused").fetchSemanticsNodes().isNotEmpty() }
+        repeat(2) { rule.onRoot().performTouchInput { swipeUp() } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithContentDescription("Resume").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription("Resume").performTouchInput { click(center) }
+        repeat(2) { rule.onRoot().performTouchInput { swipeDown() } }
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Standing").fetchSemanticsNodes().isNotEmpty() }
+        repeat(2) { rule.onRoot().performTouchInput { swipeUp() } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithContentDescription("End session").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription("End session").performTouchInput { click(center) }
         rule.onNodeWithText("End this session?").assertIsDisplayed()
         rule.onNodeWithContentDescription("Confirm end session").performTouchInput { click(center) }

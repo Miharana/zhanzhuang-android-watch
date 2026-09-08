@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.zhanzhuang.timer.mobile.data.SessionRepository
 import app.zhanzhuang.timer.mobile.health.HealthAvailability
 import app.zhanzhuang.timer.mobile.health.HealthConnectGateway
+import app.zhanzhuang.timer.mobile.health.HealthExportConsent
 import app.zhanzhuang.timer.mobile.health.HealthPermissionState
 import app.zhanzhuang.timer.mobile.session.MobileSessionUiState
 import app.zhanzhuang.timer.model.SessionConfig
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 data class WatchConnectionState(val connected: Boolean, val name: String? = null)
@@ -49,6 +51,11 @@ interface MobileTrainingActions {
     suspend fun finish(record: SessionRecord, cancelled: Boolean)
 }
 
+enum class TrainingActionError {
+    START_FAILED,
+    UPDATE_FAILED,
+}
+
 data class TrainingUiState(
     val config: SessionConfig = SessionConfig(),
     val session: SessionRecord? = null,
@@ -56,11 +63,14 @@ data class TrainingUiState(
     val remainingMs: Long = 0,
     val watchConnected: Boolean = false,
     val watchName: String? = null,
+    val actionInProgress: Boolean = false,
+    val actionError: TrainingActionError? = null,
 )
 
 data class HealthUiState(
     val availability: HealthAvailability? = null,
     val permission: HealthPermissionState = HealthPermissionState.Missing(emptySet()),
+    val exportConsentAccepted: Boolean = false,
 )
 
 enum class MobileDestination { TRAINING, HISTORY, SETTINGS, DETAIL }
@@ -87,6 +97,7 @@ class MainViewModel(
     private val wearRuntime: WearRuntimePort,
     private val healthGateway: HealthConnectGateway,
     private val healthPermission: HealthPermissionPort,
+    private val healthExportConsent: HealthExportConsent,
     private val reconcileHealth: suspend () -> Unit,
     private val now: () -> Instant = Instant::now,
     private val zoneId: () -> ZoneId = ZoneId::systemDefault,
@@ -146,22 +157,36 @@ class MainViewModel(
 
     fun selectInterval(minutes: Int) = updateConfig { it.copy(intervalMinutes = minutes) }
 
-    fun start() = viewModelScope.launch {
-        val record = trainingActions.start(state.value.training.config, state.value.training.watchConnected)
-        update { copy(training = training.copy(session = record, activeElapsedMs = record.activeDurationMs, remainingMs = durationMs(record) - record.activeDurationMs)) }
+    fun start() {
+        launchTrainingAction(TrainingActionError.START_FAILED) {
+            val current = state.value.training
+            if (current.session?.status in ACTIVE_STATUSES) return@launchTrainingAction
+            val record = trainingActions.start(current.config, current.watchConnected)
+            update {
+                copy(
+                    training = training.copy(
+                        session = record,
+                        activeElapsedMs = record.activeDurationMs,
+                        remainingMs = durationMs(record) - record.activeDurationMs,
+                    ),
+                )
+            }
+        }
     }
 
     fun pause() = withActiveRecord { trainingActions.pause(it) }
     fun resume() = withActiveRecord { trainingActions.resume(it) }
     fun finish(cancelled: Boolean) = withActiveRecord { trainingActions.finish(it, cancelled) }
 
-    /** This is the only path that emits a Health Connect permission request. */
+    /** Called only after the in-app Health Connect disclosure has been accepted. */
     fun requestHealthPermissions() = viewModelScope.launch {
         val availability = healthGateway.availability()
         if (availability == HealthAvailability.UNAVAILABLE) {
-            update { copy(health = HealthUiState(availability, health.permission)) }
+            update { copy(health = HealthUiState(availability, health.permission, healthExportConsent.isAccepted())) }
             return@launch
         }
+        healthExportConsent.accept()
+        update { copy(health = health.copy(exportConsentAccepted = true)) }
         val required = healthGateway.requiredWritePermissions(includeHeartRate = true)
         when (val permissionState = healthPermission.state(required)) {
             HealthPermissionState.Granted -> update { copy(health = health.copy(permission = permissionState)) }
@@ -172,7 +197,12 @@ class MainViewModel(
         }
     }
 
-    fun onHealthPermissionResult() = refreshHealthStatus()
+    fun onHealthPermissionResult() = viewModelScope.launch {
+        refreshHealthStatusNow()
+        if (healthExportConsent.isAccepted() && state.value.health.permission is HealthPermissionState.Granted) {
+            reconcileHealth()
+        }
+    }
 
     fun retryHealthSync() = viewModelScope.launch { reconcileHealth(); refreshHealthStatus() }
 
@@ -180,11 +210,13 @@ class MainViewModel(
     fun showDetail(record: SessionRecord) = update { copy(destination = MobileDestination.DETAIL, selectedRecord = record) }
     fun backToHistory() = update { copy(destination = MobileDestination.HISTORY, selectedRecord = null) }
 
-    private fun refreshHealthStatus() = viewModelScope.launch {
+    private fun refreshHealthStatus() = viewModelScope.launch { refreshHealthStatusNow() }
+
+    private suspend fun refreshHealthStatusNow() {
         val availability = healthGateway.availability()
         val required = healthGateway.requiredWritePermissions(includeHeartRate = true)
         val permission = healthPermission.state(required)
-        update { copy(health = HealthUiState(availability, permission)) }
+        update { copy(health = HealthUiState(availability, permission, healthExportConsent.isAccepted())) }
     }
 
     private fun updateConfig(change: (SessionConfig) -> SessionConfig) {
@@ -192,8 +224,27 @@ class MainViewModel(
         defaults.save(config)
     }
 
-    private fun withActiveRecord(action: suspend (SessionRecord) -> Unit) = viewModelScope.launch {
-        state.value.training.session?.takeIf { it.status in ACTIVE_STATUSES }?.let { action(it) }
+    private fun withActiveRecord(action: suspend (SessionRecord) -> Unit) {
+        launchTrainingAction(TrainingActionError.UPDATE_FAILED) {
+            state.value.training.session?.takeIf { it.status in ACTIVE_STATUSES }?.let { action(it) }
+        }
+    }
+
+    private fun launchTrainingAction(
+        failure: TrainingActionError,
+        action: suspend () -> Unit,
+    ) = viewModelScope.launch {
+        if (state.value.training.actionInProgress) return@launch
+        update { copy(training = training.copy(actionInProgress = true, actionError = null)) }
+        try {
+            action()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            update { copy(training = training.copy(actionError = failure)) }
+        } finally {
+            update { copy(training = training.copy(actionInProgress = false)) }
+        }
     }
 
     private fun refreshTrainingFromSources() {

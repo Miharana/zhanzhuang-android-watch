@@ -1,0 +1,1 @@
+Adds the required branded Wear OS launch screen with a centered 48dp app icon on a black background.
