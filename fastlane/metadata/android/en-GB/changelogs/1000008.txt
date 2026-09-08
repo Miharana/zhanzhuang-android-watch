@@ -1,0 +1,1 @@
+Introduces the E taiji timer, a gold interval-progress ring, and reliable paired-watch session discovery.

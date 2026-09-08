@@ -114,7 +114,7 @@ class SharedPreferencesSessionSnapshotStore(
     private fun JSONObject.getLongOrNull(name: String): Long? = if (isNull(name)) null else getLong(name)
 
     private companion object {
-        const val KEY = "wear_session_snapshot_v1"
+        const val KEY = WearSessionRecoveryPolicy.SNAPSHOT_KEY
         const val MAX_PENDING_SAMPLES = 20
     }
 }

@@ -15,6 +15,7 @@ sealed interface HealthWriteResult {
     ) : HealthWriteResult
 
     data class PermissionMissing(val permissions: Set<String>) : HealthWriteResult
+    data object ConsentMissing : HealthWriteResult
     data class Unavailable(val reason: String) : HealthWriteResult
     data class Retryable(val reason: String) : HealthWriteResult
     data class PermanentFailure(val reason: String) : HealthWriteResult

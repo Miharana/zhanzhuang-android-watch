@@ -90,7 +90,7 @@ reject_permission() {
 }
 
 inspect_apk() {
-    local module=$1 apk=$2 min_sdk=$3 version_code=$4
+    local module=$1 apk=$2 min_sdk=$3 version_code=$4 version_name=$5
     local application_id badging manifest xmltree resources
     application_id=$("$apkanalyzer" manifest application-id "$apk") || fail "$module: apkanalyzer could not read $apk"
     [[ "$application_id" == 'app.zhanzhuang.timer.debug' ]] || fail "$module: expected debug application ID app.zhanzhuang.timer.debug, got $application_id"
@@ -99,7 +99,7 @@ inspect_apk() {
     xmltree=$("$aapt" dump xmltree "$apk" AndroidManifest.xml) || fail "$module: aapt could not inspect manifest tree"
     resources=$("$aapt" dump --values resources "$apk") || fail "$module: aapt could not inspect resources"
     expect_contains "$badging" "versionCode='$version_code'" "$module badging"
-    expect_contains "$badging" "versionName='0.1.0'" "$module badging"
+    expect_contains "$badging" "versionName='$version_name'" "$module badging"
     expect_contains "$badging" "compileSdkVersion='36'" "$module badging"
     expect_contains "$badging" "sdkVersion:'$min_sdk'" "$module badging"
     expect_contains "$badging" "targetSdkVersion:'36'" "$module badging"
@@ -114,7 +114,7 @@ inspect_apk() {
     printf '%s\n' "$manifest"
 }
 
-mobile_manifest=$(inspect_apk mobile "$mobile_apk" 28 1000001)
+mobile_manifest=$(inspect_apk mobile "$mobile_apk" 28 1000011 0.1.11)
 for permission in \
     android.permission.FOREGROUND_SERVICE \
     android.permission.FOREGROUND_SERVICE_SPECIAL_USE \
@@ -127,7 +127,7 @@ done
 expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService' and @*[local-name()='foregroundServiceType']='0x40000000']" 1 'mobile special-use service'
 expect_xml_count "$mobile_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.mobile.session.MobileSessionService']/*[local-name()='property' and @*[local-name()='name']='android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE' and @*[local-name()='value']='standing_meditation_timer']" 1 'mobile special-use justification'
 
-wear_manifest=$(inspect_apk wear "$wear_apk" 33 2000001)
+wear_manifest=$(inspect_apk wear "$wear_apk" 33 2000013 0.1.12)
 expect_xml_count "$wear_manifest" "//*[local-name()='uses-feature' and @*[local-name()='name']='android.hardware.type.watch' and @*[local-name()='required']='true']" 1 'Wear watch form factor'
 expect_xml_count "$wear_manifest" "//*[local-name()='application']/*[local-name()='meta-data' and @*[local-name()='name']='com.google.android.wearable.standalone' and @*[local-name()='value']='true']" 1 'Wear standalone metadata'
 for permission in \
@@ -143,7 +143,8 @@ require_permission_attribute "$wear_manifest" android.permission.BODY_SENSORS ma
 require_permission_attribute "$wear_manifest" android.permission.BODY_SENSORS_BACKGROUND maxSdkVersion 35 Wear
 require_permission_attribute "$wear_manifest" android.permission.health.READ_HEART_RATE minSdkVersion 36 Wear
 require_permission_attribute "$wear_manifest" android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND minSdkVersion 36 Wear
-expect_xml_count "$wear_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.wear.session.WearSessionService' and @*[local-name()='foregroundServiceType']='0x100']" 1 'Wear health foreground service'
+expect_xml_count "$wear_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.wear.session.WearSessionService' and @*[local-name()='foregroundServiceType']='0x40000100']" 1 'Wear health and special-use foreground service'
+expect_xml_count "$wear_manifest" "//*[local-name()='service' and @*[local-name()='name']='app.zhanzhuang.timer.wear.session.WearSessionService']/*[local-name()='property' and @*[local-name()='name']='android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE' and @*[local-name()='value']='standing_meditation_timer']" 1 'Wear special-use justification'
 
 for module in mobile wear; do
     release_manifest="$repo_root/$module/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml"

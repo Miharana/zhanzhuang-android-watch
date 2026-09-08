@@ -1,7 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="gold-sheen" x1="96" y1="72" x2="412" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E7D5A6"/>
+      <stop offset=".32" stop-color="#C6A867"/>
+      <stop offset=".72" stop-color="#A9863F"/>
+      <stop offset="1" stop-color="#E7D5A6"/>
+    </linearGradient>
+  </defs>
   <rect width="512" height="512" rx="256" fill="#15110B"/>
-  <circle cx="256" cy="256" r="224" fill="#241C12" stroke="#C6A867" stroke-width="4"/>
-  <path d="M256 105c-20 0-36 16-36 36v67l-49 63c-9 12-7 29 5 38 11 9 28 7 37-5l31-39v102h-31c-15 0-27 12-27 27s12 27 27 27h86c15 0 27-12 27-27s-12-27-27-27h-31V265l31 39c9 12 26 14 37 5 12-9 14-26 5-38l-49-63v-67c0-20-16-36-36-36Z" fill="#C6A867"/>
-  <path d="M256 123c-9 0-16 7-16 16v70h32v-70c0-9-7-16-16-16Z" fill="#E7D5A6"/>
-  <path d="M383 113l8 26 26 8-26 8-8 26-8-26-26-8 26-8 8-26Z" fill="#FFF4D6"/>
+  <circle cx="256" cy="256" r="224" fill="#241C12"/>
+  <g id="e-taiji-interval-mark" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle id="e-outer-rim" cx="256" cy="256" r="205" stroke="url(#gold-sheen)" stroke-width="7"/>
+    <g id="e-taiji" stroke="none">
+      <circle id="taiji-disc" cx="256" cy="184" r="67" fill="url(#gold-sheen)"/>
+      <path id="taiji-soil-half" d="M256 117A67 67 0 0 1 256 251A33.5 33.5 0 0 1 256 184A33.5 33.5 0 0 0 256 117Z" fill="#241C12"/>
+      <circle id="taiji-soil-dot" cx="256" cy="150.5" r="9" fill="#241C12"/>
+      <circle id="taiji-gold-dot" cx="256" cy="217.5" r="9" fill="#E7D5A6"/>
+    </g>
+    <circle id="e-lower-left-ring" cx="196" cy="315" r="38" stroke="url(#gold-sheen)" stroke-width="10"/>
+    <circle id="e-lower-right-ring" cx="316" cy="315" r="38" stroke="url(#gold-sheen)" stroke-width="10"/>
+    <path id="e-glint" d="M424 74L429 91L446 96L429 101L424 118L419 101L402 96L419 91Z" fill="#E7D5A6" stroke="none"/>
+  </g>
 </svg>

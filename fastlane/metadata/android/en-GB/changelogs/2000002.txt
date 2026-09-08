@@ -1,0 +1,1 @@
+Safer first launch and duration-only timing without heart-rate permission. Adds contextual notification permission, improves phone reconnection and current-session recovery, and introduces the gold holding-ball icon.

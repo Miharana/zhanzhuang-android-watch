@@ -1,0 +1,1 @@
+Fixes Wear OS text clipping at the default font size and keeps round-screen controls fully visible.

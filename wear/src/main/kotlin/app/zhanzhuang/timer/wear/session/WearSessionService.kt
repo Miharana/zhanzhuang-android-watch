@@ -1,7 +1,5 @@
 package app.zhanzhuang.timer.wear.session
 
-import android.app.PendingIntent
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -9,6 +7,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.os.Vibrator
 import androidx.health.services.client.HealthServices
+import androidx.core.app.ServiceCompat
 import androidx.room.Room
 import app.zhanzhuang.timer.model.SessionConfig
 import app.zhanzhuang.timer.model.SessionOwner
@@ -16,6 +15,7 @@ import app.zhanzhuang.timer.model.SessionRuntime
 import app.zhanzhuang.timer.wear.data.WearDatabase
 import app.zhanzhuang.timer.wear.data.WearSessionRepository
 import app.zhanzhuang.timer.wear.health.AndroidWearHealthClient
+import app.zhanzhuang.timer.wear.health.PermissionAwareWearHealthClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,7 +46,10 @@ class WearSessionService : Service() {
     override fun onCreate() {
         super.onCreate()
         val database = Room.databaseBuilder(applicationContext, WearDatabase::class.java, "wear-sessions.db").build()
-        val health = AndroidWearHealthClient(HealthServices.getClient(applicationContext).exerciseClient)
+        val health = PermissionAwareWearHealthClient(
+            delegate = AndroidWearHealthClient(HealthServices.getClient(applicationContext).exerciseClient),
+            permissionGranted = { WearForegroundPolicy.hasHeartRatePermission(applicationContext) },
+        )
         controller = WearSessionControllerImpl(
             records = RepositoryRecordStore(WearSessionRepository(database)),
             snapshots = SharedPreferencesSessionSnapshotStore(
@@ -81,9 +84,19 @@ class WearSessionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = commandFrom(intent) ?: Command.Status
+        val preferences = getSharedPreferences(WearSessionRecoveryPolicy.PREFERENCES_NAME, Context.MODE_PRIVATE)
+        if (command == Command.Status && !WearSessionRecoveryPolicy.hasSnapshot(preferences)) {
+            // Defensive guard for stale/system callers. A clean install has no
+            // recoverable work and must not enter the foreground-service path.
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val commandGeneration = generation.incrementAndGet()
-        // This satisfies the FGS deadline; the recovery-only notification has no OngoingActivity extension.
-        startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
+        if (command != Command.Status || WearSessionRecoveryPolicy.statusRequiresForeground(preferences)) {
+            // This satisfies the FGS deadline for active work; the recovery-only
+            // notification has no OngoingActivity extension.
+            promoteToForeground()
+        }
         requests.trySend(ServiceRequest.Command(command, intent?.getStringExtra(EXTRA_SESSION_ID), intent?.getStringExtra(EXTRA_REQUEST_ID), startId, commandGeneration))
         return START_STICKY
     }
@@ -161,7 +174,7 @@ class WearSessionService : Service() {
 
     private fun publishForeground(requestGeneration: Long) {
         if (requestGeneration != generation.get() || controller.state.value.record?.status !in ACTIVE_STATUSES) return
-        startForeground(OngoingSessionNotification.NOTIFICATION_ID, notification.build(controller.state.value, statusIntent()))
+        promoteToForeground()
     }
 
     /**
@@ -188,7 +201,9 @@ class WearSessionService : Service() {
         if (force) runtimePublishJob?.cancel()
         runtimePublishJob = serviceScope.launch {
             try {
-                app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext).publishRuntime(runtime)
+                val sync = app.zhanzhuang.timer.wear.sync.WearSyncRuntime.get(applicationContext)
+                if (force) sync.publishState(record)
+                sync.publishRuntime(runtime)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
@@ -213,12 +228,15 @@ class WearSessionService : Service() {
         data class Tick(val startId: Int, val generation: Long) : ServiceRequest
     }
 
-    private fun statusIntent(): PendingIntent = PendingIntent.getService(
-        this,
-        0,
-        Intent(this, WearSessionService::class.java).setAction(ACTION_STATUS),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
+    private fun promoteToForeground() {
+        val hasHeartRatePermission = WearForegroundPolicy.hasHeartRatePermission(this)
+        ServiceCompat.startForeground(
+            this,
+            OngoingSessionNotification.NOTIFICATION_ID,
+            notification.build(controller.state.value, notification.openActivityIntent()),
+            WearForegroundPolicy.serviceTypeMask(hasHeartRatePermission),
+        )
+    }
 
     sealed interface Command {
         data class Start(val config: SessionConfig, val sessionId: String) : Command

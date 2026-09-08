@@ -31,6 +31,14 @@ Upload only bilingual store metadata and listing assets to the internal track
 
 Upload the verified first mobile AAB and prepared listing to internal testing
 
+### android upload_mobile_internal_binary_only
+
+```sh
+[bundle exec] fastlane android upload_mobile_internal_binary_only
+```
+
+Upload only the verified mobile AAB to internal testing
+
 ### android upload_wear_internal
 
 ```sh

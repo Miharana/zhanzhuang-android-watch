@@ -12,3 +12,7 @@ service-account*.json
 *.properties.local
 .idea/
 *.iml
+.DS_Store
+.scratch/
+.worktrees/
+fastlane/report.xml

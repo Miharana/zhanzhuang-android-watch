@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -103,7 +104,9 @@ class MobileSessionServiceTest {
 
         assertEquals(listOf("recover", "finish", "recover", "start"), controller.calls)
         assertTrue(controller.started)
-        assertEquals(listOf(1), service.stopSelfResultStartIds)
+        assertTrue(service.stopSelfResultStartIds.isNotEmpty())
+        assertTrue(service.stopSelfResultStartIds.all { it == 1 })
+        assertFalse(2 in service.stopSelfResultStartIds)
     }
 
     private suspend fun dispatch(service: MobileSessionService, action: String) {

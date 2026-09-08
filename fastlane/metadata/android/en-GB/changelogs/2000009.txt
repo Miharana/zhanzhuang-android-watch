@@ -1,0 +1,1 @@
+Introduces the E taiji timer and improves phone-to-watch session discovery and control.

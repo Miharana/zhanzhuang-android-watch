@@ -5,6 +5,7 @@ import androidx.room.Room
 import app.zhanzhuang.timer.mobile.data.MobileDatabase
 import app.zhanzhuang.timer.mobile.data.MobileSessionRepository
 import app.zhanzhuang.timer.model.PATH_ACK
+import app.zhanzhuang.timer.model.CAPABILITY_ZHAN_ZHUANG_WEAR
 import app.zhanzhuang.timer.model.PATH_COMMAND
 import app.zhanzhuang.timer.model.PATH_COMPLETED
 import app.zhanzhuang.timer.model.PATH_STATE
@@ -100,7 +101,7 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
             else -> PATH_COMMAND
         }
         val nodes = withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getCapabilityClient(appContext)
-            .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_REACHABLE)
+            .getCapability(CAPABILITY_ZHAN_ZHUANG_WEAR, CapabilityClient.FILTER_REACHABLE)
             .await()
             .nodes } ?: return false
         return nodes.map { node ->
@@ -129,5 +130,5 @@ class MobileAndroidDataLayerTransport(context: Context) : SyncTransport {
         return runCatching { withTimeoutOrNull(TRANSPORT_TIMEOUT_MS) { Wearable.getDataClient(appContext).putDataItem(request).await() } != null }.getOrDefault(false)
     }
 
-    private companion object { const val CAPABILITY_NAME = "zhan_zhang_sync"; const val TRANSPORT_TIMEOUT_MS = 4_000L }
+    private companion object { const val TRANSPORT_TIMEOUT_MS = 4_000L }
 }
