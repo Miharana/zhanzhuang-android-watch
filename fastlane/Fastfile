@@ -1,0 +1,84 @@
+default_platform(:android)
+
+def supply_json_key!
+  path = ENV.fetch("SUPPLY_JSON_KEY")
+  repo_root = File.expand_path("..", __dir__)
+  expanded_path = File.expand_path(path)
+  UI.user_error!("SUPPLY_JSON_KEY must point to a file outside this repository") if expanded_path.start_with?("#{repo_root}/")
+  UI.user_error!("SUPPLY_JSON_KEY file is unavailable") unless File.file?(expanded_path)
+  expanded_path
+end
+
+platform :android do
+  desc "Upload only bilingual store metadata and listing assets to the internal track"
+  lane :publish_metadata do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      metadata_path: "fastlane/metadata/android",
+      track: "internal",
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_changelogs: true
+    )
+  end
+
+  desc "Upload the verified first mobile AAB and prepared listing to internal testing"
+  lane :upload_mobile_internal do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      aab: "mobile/build/outputs/bundle/release/mobile-release.aab",
+      metadata_path: "fastlane/metadata/android",
+      track: "internal",
+      release_status: "completed"
+    )
+  end
+
+  desc "Upload the verified Wear AAB to the confirmed Wear OS internal track"
+  lane :upload_wear_internal do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      aab: "wear/build/outputs/bundle/release/wear-release.aab",
+      metadata_path: "fastlane/metadata/android",
+      track: "wear:internal",
+      release_status: "completed",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Promote the verified mobile release from internal testing to production"
+  lane :promote_mobile_production do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      track: "internal",
+      track_promote_to: "production",
+      track_promote_release_status: "draft",
+      version_code: 1_000_001,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
+    )
+  end
+
+  desc "Promote the verified Wear OS release from internal testing to production"
+  lane :promote_wear_production do
+    upload_to_play_store(
+      json_key: supply_json_key!,
+      package_name: "app.zhanzhuang.timer",
+      track: "wear:internal",
+      track_promote_to: "wear:production",
+      track_promote_release_status: "draft",
+      version_code: 2_000_001,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
+    )
+  end
+end

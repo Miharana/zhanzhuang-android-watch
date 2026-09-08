@@ -1,0 +1,1 @@
+First release: quiet timers, interval haptics, optional Wear heart-rate history, local session history, and optional Health Connect writing.

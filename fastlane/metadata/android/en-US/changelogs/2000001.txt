@@ -1,0 +1,1 @@
+First Wear OS release: standalone quiet timer, interval haptics, optional informational heart-rate recording, and local sync to a paired phone.

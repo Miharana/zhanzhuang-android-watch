@@ -1,0 +1,12 @@
+{
+  "provider": "cloudflare-workers",
+  "project_id": "cloudflare-workers/248920f7242af23888268990390aae59/zhanzhuang-privacy",
+  "account_id": "248920f7242af23888268990390aae59",
+  "worker_name": "zhanzhuang-privacy",
+  "production_url": "https://zhanzhuang-privacy.artlinx.workers.dev",
+  "deployment_status": "deployed",
+  "current_version_id": "928f59ce-1c62-4193-8fa6-72d2247c1541",
+  "source_commit": "420e71e",
+  "d1": null,
+  "r2": null
+}
